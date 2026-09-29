@@ -50,7 +50,7 @@ class CommandLineTest {
     }
 
     @Test void futureCommandsReportNotImplementedAndDoNotWriteAnything() {
-        for (String name : new String[]{"status", "add", "commit", "log", "diff", "branch", "checkout", "restore"}) {
+        for (String name : new String[]{"status", "commit", "log", "diff", "branch", "checkout", "restore"}) {
             Result result = execute(name);
             assertEquals(3, result.code(), name);
             assertEquals("Not implemented yet.", result.err().strip());
@@ -74,5 +74,23 @@ class CommandLineTest {
         assertTrue(result.err().startsWith("error: "));
         assertFalse(result.err().contains("\tat "));
         assertEquals("keep me", Files.readString(temp.resolve(".pocketgit")));
+    }
+
+    @Test void addHasHelpArgumentValidationAndCleanErrors() throws Exception {
+        assertEquals(0, execute("add", "--help").code());
+        assertEquals(2, execute("add").code());
+        assertEquals(2, execute("add", "one", "two").code());
+        assertEquals(2, execute("add", "--unknown").code());
+        assertEquals(1, execute("add", "").code());
+        Result outside = execute("add", "file");
+        assertEquals(1, outside.code());
+        assertTrue(outside.err().contains("not a PocketGit repository"));
+        execute("init");
+        Files.writeString(temp.resolve("file"), "hello");
+        Result result = execute("add", "file");
+        assertEquals(0, result.code());
+        assertEquals("Staged file", result.out().strip());
+        Files.writeString(temp.resolve("-notes"), "flag-like filename");
+        assertEquals(0, execute("add", "--", "-notes").code());
     }
 }

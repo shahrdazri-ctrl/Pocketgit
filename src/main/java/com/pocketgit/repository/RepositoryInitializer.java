@@ -1,6 +1,7 @@
 package com.pocketgit.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pocketgit.util.JsonUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -36,7 +37,7 @@ public final class RepositoryInitializer {
         Files.createDirectory(repository.logsDirectory());
         writeNew(repository.headFile(), "ref: refs/heads/main\n");
         writeNew(repository.mainRefFile(), "");
-        String index = new ObjectMapper().writerWithDefaultPrettyPrinter()
+        String index = new ObjectMapper().writer(JsonUtils.prettyPrinter())
                 .writeValueAsString(new EmptyIndex(1, List.of())) + "\n";
         writeNew(repository.indexFile(), index);
         return new InitializationResult(repository, true);

@@ -17,3 +17,9 @@ Maven separates unit tests (`*Test`, Surefire) from packaged integration tests (
 `Blob` and `StoredObject` defensively copy byte arrays and implement content-based equality. Tree and commit object type envelopes are supported now; their semantic payload schemas arrive when those features are implemented.
 
 `ObjectInspectionService` discovers repositories and provides verified reads and UTF-8 text inspection. `CatObjectCommand` only parses modes, invokes the service, and writes output. Raw payload output uses an injected `OutputStream` so binary bytes never pass through character encoding; help, metadata, and errors retain Picocli's text writers.
+
+## Phase 3 additions
+
+`Index` and `IndexEntry` are immutable, sorted, validated snapshots. `IndexStore` reads strict version-1 JSON, owns the update lock, and publishes snapshots by atomic replacement. `AddService` owns discovery, scope planning, tracked deletions, ignore matching, safe reads, Blob writes, file/directory transitions, and final index publication. `AddCommand` only parses its path, invokes the service, and prints the result.
+
+`IgnoreMatcher` implements the documented small root ignore-file grammar without Git or external programs. `PathUtils` centralizes safe working-tree resolution and portable index paths. `HashUtils` supplies shared SHA-256 ID validation. `JsonUtils` configures fresh pretty printers with explicit LF line endings for deterministic metadata on all operating systems.

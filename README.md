@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1 and 2 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, zlib compression, validated reads, and `cat-object` inspection. Staging, commits, status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
+Phases 1–3 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, and staging with `add` and `.pocketgitignore`. Commits, status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -58,7 +58,17 @@ pocketgit cat-object HASH > recovered.bin
 
 Default output contains only the exact payload bytes, without a header or added newline. `--type` prints `blob`, `tree`, or `commit`; `--size` prints the payload byte length. `--pretty` displays valid UTF-8 text and rejects NUL-containing or invalid UTF-8 payloads. Choose one inspection mode at a time. Every mode validates the complete stored object, including its SHA-256 ID.
 
-Object creation is currently available through the Java `ObjectStore` API; the `add` CLI arrives in Phase 3. See [the object database API](docs/object-database.md) for an example. The default payload limit is 64 MiB. Object writes require filesystem hard-link support, available on typical NTFS, APFS, and ext4 installations; unsupported filesystems fail instead of weakening publication safety.
+Objects are created by `add` or the Java `ObjectStore` API. See [the object database API](docs/object-database.md) for an example. The default payload limit is 64 MiB. Object writes require filesystem hard-link support, available on typical NTFS, APFS, and ext4 installations; unsupported filesystems fail instead of weakening publication safety.
+
+## Stage files
+
+```bash
+pocketgit add README.md
+pocketgit add src/
+pocketgit add .
+```
+
+`add .` stages the whole repository, including from nested directories. Other paths resolve from the invocation directory. Files become byte-exact Blob objects; directory scopes also remove index entries for deleted files. Root `.pocketgitignore` rules exclude untracked files, while already indexed files remain tracked. Symlinks and paths outside the repository are rejected. [Staging documentation](docs/staging.md) defines the supported ignore grammar and safety behavior.
 
 ## Implementation notes
 
@@ -67,5 +77,7 @@ Object creation is currently available through the Java `ObjectStore` API; the `
 - [Phase 1 validation](docs/phase-1-validation.md)
 - [Object database design and API](docs/object-database.md)
 - [Phase 2 validation](docs/phase-2-validation.md)
+- [Staging and ignore rules](docs/staging.md)
+- [Phase 3 validation](docs/phase-3-validation.md)
 
-The next phase is the staging index and `add`. Subsequent work follows the master prompt in order.
+The next phase is Tree construction and commit creation. Subsequent work follows the master prompt in order.
