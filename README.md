@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phase 1 is implemented: Java 21 foundation, Picocli CLI, executable JAR, safe repository initialization, and discovery from nested directories. The remaining commands are explicit placeholders and exit with code 3.
+Phases 1 and 2 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, zlib compression, validated reads, and `cat-object` inspection. Staging, commits, status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -45,10 +45,27 @@ pocketgit init
 
 CLI exit codes: 0 for success/help, 1 for execution failures, 2 for invalid arguments, and 3 for commands that have not been implemented. Future commands currently accept arguments without validating their eventual syntax and report `Not implemented yet.`
 
-## Phase 1 design
+## Inspect stored objects
+
+Use a full lowercase 64-character SHA-256 ID. Discovery works from nested working-tree directories.
+
+```bash
+pocketgit cat-object --type HASH
+pocketgit cat-object --size HASH
+pocketgit cat-object --pretty HASH
+pocketgit cat-object HASH > recovered.bin
+```
+
+Default output contains only the exact payload bytes, without a header or added newline. `--type` prints `blob`, `tree`, or `commit`; `--size` prints the payload byte length. `--pretty` displays valid UTF-8 text and rejects NUL-containing or invalid UTF-8 payloads. Choose one inspection mode at a time. Every mode validates the complete stored object, including its SHA-256 ID.
+
+Object creation is currently available through the Java `ObjectStore` API; the `add` CLI arrives in Phase 3. See [the object database API](docs/object-database.md) for an example. The default payload limit is 64 MiB. Object writes require filesystem hard-link support, available on typical NTFS, APFS, and ext4 installations; unsupported filesystems fail instead of weakening publication safety.
+
+## Implementation notes
 
 - [Architecture](docs/architecture.md)
 - [Initialized metadata format and safety policy](docs/repository-format.md)
 - [Phase 1 validation](docs/phase-1-validation.md)
+- [Object database design and API](docs/object-database.md)
+- [Phase 2 validation](docs/phase-2-validation.md)
 
-The next phase is the content-addressable object database. Staging, commits, status, history, branching, checkout, diff, and restore will follow the master prompt in order.
+The next phase is the staging index and `add`. Subsequent work follows the master prompt in order.

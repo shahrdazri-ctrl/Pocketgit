@@ -9,3 +9,11 @@ Services can be used directly without Picocli. CLI construction accepts an expli
 The initializer uses an exclusive directory creation as its ownership gate and `CREATE_NEW` for metadata files. Only the invocation that creates `.pocketgit` writes initial contents. Reinitialization checks structural prerequisites and performs no writes. There is no Git/JGit dependency or external-process execution in application code. Integration tests launch Java only to test the packaged artifact.
 
 Maven separates unit tests (`*Test`, Surefire) from packaged integration tests (`*IT`, Failsafe). Shade produces a runnable JAR containing Picocli and Jackson. Later phases will add domain objects and services as their behavior is implemented, rather than introducing empty classes for speculative functionality.
+
+## Phase 2 additions
+
+`ObjectStore` is the public object-database facade. `ObjectHasher` constructs canonical bytes and hashes them. `ObjectPaths` centralizes ID validation and rejects symlinked metadata, prefix directories, and object paths. `ObjectWriter` compresses and fully writes private temporary files, then exclusively publishes them through a hard link. `ObjectReader` validates one complete zlib stream, the canonical header, declared payload length, and SHA-256 before returning an immutable `StoredObject`.
+
+`Blob` and `StoredObject` defensively copy byte arrays and implement content-based equality. Tree and commit object type envelopes are supported now; their semantic payload schemas arrive when those features are implemented.
+
+`ObjectInspectionService` discovers repositories and provides verified reads and UTF-8 text inspection. `CatObjectCommand` only parses modes, invokes the service, and writes output. Raw payload output uses an injected `OutputStream` so binary bytes never pass through character encoding; help, metadata, and errors retain Picocli's text writers.
