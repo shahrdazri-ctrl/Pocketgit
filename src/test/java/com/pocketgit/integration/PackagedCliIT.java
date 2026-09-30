@@ -30,15 +30,15 @@ class PackagedCliIT {
         return new Result(process.exitValue(), Files.readString(output));
     }
 
-    @Test void packagedJarSupportsHelpVersionAndPlaceholder() throws Exception {
+    @Test void packagedJarSupportsHelpVersionAndCleanRepositoryErrors() throws Exception {
         Result help = run(temp, "--help");
         assertEquals(0, help.code());
         assertTrue(help.output().contains("Usage: pocketgit"));
         assertTrue(help.output().contains("restore"));
         assertEquals("PocketGit 0.1.0", run(temp, "--version").output().strip());
-        Result placeholder = run(temp, "restore");
-        assertEquals(3, placeholder.code());
-        assertEquals("Not implemented yet.", placeholder.output().strip());
+        Result placeholder = run(temp, "diff");
+        assertEquals(1, placeholder.code());
+        assertTrue(placeholder.output().contains("not a PocketGit repository"));
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 

@@ -1,6 +1,10 @@
 package com.pocketgit;
 
 import com.pocketgit.cli.InitCommand;
+import com.pocketgit.cli.DiffCommand;
+import com.pocketgit.cli.RestoreCommand;
+import com.pocketgit.services.DiffService;
+import com.pocketgit.services.RestoreService;
 import com.pocketgit.cli.CheckoutCommand;
 import com.pocketgit.services.CheckoutService;
 import com.pocketgit.cli.LogCommand;
@@ -13,7 +17,6 @@ import com.pocketgit.cli.AddCommand;
 import com.pocketgit.cli.CommitCommand;
 import com.pocketgit.cli.ConfigCommand;
 import com.pocketgit.cli.StatusCommand;
-import com.pocketgit.cli.PlaceholderCommand;
 import com.pocketgit.cli.RootCommand;
 import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.services.ObjectInspectionService;
@@ -22,7 +25,6 @@ import com.pocketgit.services.CommitService;
 import com.pocketgit.services.StatusService;
 import java.io.OutputStream;
 import java.nio.file.Path;
-import java.util.List;
 import picocli.CommandLine;
 
 public final class PocketGit {
@@ -46,12 +48,8 @@ public final class PocketGit {
         command.addSubcommand(new ShowCommand(workingDirectory, new LogService()));
         command.addSubcommand(new BranchCommand(workingDirectory, new BranchService()));
         command.addSubcommand(new CheckoutCommand(workingDirectory, new CheckoutService()));
-        for (String name : List.of("diff", "restore")) {
-            CommandLine placeholder = new CommandLine(new PlaceholderCommand());
-            placeholder.getCommandSpec().name(name);
-            placeholder.getCommandSpec().usageMessage().description("Not implemented yet (future phase).");
-            command.addSubcommand(name, placeholder);
-        }
+        command.addSubcommand(new DiffCommand(workingDirectory, new DiffService()));
+        command.addSubcommand(new RestoreCommand(workingDirectory, new RestoreService()));
         command.setExecutionExceptionHandler((exception, cli, parsed) -> {
             String detail = exception.getMessage();
             cli.getErr().println("error: " + (detail == null ? "operation failed" : detail));

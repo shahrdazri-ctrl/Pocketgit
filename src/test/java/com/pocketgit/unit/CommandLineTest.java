@@ -49,15 +49,11 @@ class CommandLineTest {
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 
-    @Test void futureCommandsReportNotImplementedAndDoNotWriteAnything() {
-        for (String name : new String[]{"diff", "restore"}) {
-            Result result = execute(name);
-            assertEquals(3, result.code(), name);
-            assertEquals("Not implemented yet.", result.err().strip());
-            assertTrue(result.out().isEmpty());
+    @Test void implementedCommandsHaveCleanErrorsOutsideARepository() {
+        for (String name : new String[]{"log", "diff", "branch"}) {
+            Result result=execute(name); assertEquals(1,result.code()); assertTrue(result.err().contains("not a PocketGit repository"));
         }
-        assertEquals(1, execute("log", "--oneline").code());
-        assertFalse(Files.exists(temp.resolve(".pocketgit")));
+        assertEquals(2,execute("restore").code()); assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 
     @Test void invalidArgumentsReturnUsageErrorWithoutMutation() {
