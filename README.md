@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1–5 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, and accurate staged/unstaged/untracked status. History, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
+Phases 1–6 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, accurate staged/unstaged/untracked status, history traversal, branch creation/listing, and commit inspection by unique hash prefix. Checkout, diff, and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -95,6 +95,18 @@ Status compares HEAD with the index for staged additions/modifications/deletions
 
 Before the first commit, status reports `No commits yet`. A clean repository reports `nothing to commit, working tree clean`. Status is read-only, hashes tracked file content on every run, and works from nested directories. [Status documentation](docs/status.md) explains classification, ignored directory summaries, error behavior, and concurrent changes.
 
+## Inspect history and create branches
+
+```bash
+pocketgit log
+pocketgit log --oneline
+pocketgit show COMMIT_PREFIX
+pocketgit branch
+pocketgit branch feature/login
+```
+
+History starts at HEAD, validates parent Commits, and prints newest first for single-parent history. `show` accepts full IDs or unique lowercase hexadecimal prefixes and displays the Tree, parents, author, timestamp, and message. Missing or ambiguous prefixes fail clearly. Branches are sorted, with `*` marking the current branch; creating a branch captures the current commit without switching branches or modifying working files. Creation before the first commit and duplicate names are rejected. See [history and branches](docs/history-and-branches.md) for detached HEAD, safety, and traversal limits.
+
 ## Implementation notes
 
 - [Architecture](docs/architecture.md)
@@ -108,5 +120,7 @@ Before the first commit, status reports `No commits yet`. A clean repository rep
 - [Phase 4 validation](docs/phase-4-validation.md)
 - [Status classification and working-tree comparison](docs/status.md)
 - [Phase 5 validation](docs/phase-5-validation.md)
+- [History, references, and branches](docs/history-and-branches.md)
+- [Phase 6 validation](docs/phase-6-validation.md)
 
-The next phase is commit history, references, and branching. Subsequent work follows the master prompt in order.
+The next phase is safe checkout and branch switching. Subsequent work follows the master prompt in order.

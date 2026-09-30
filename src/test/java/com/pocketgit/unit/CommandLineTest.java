@@ -50,13 +50,13 @@ class CommandLineTest {
     }
 
     @Test void futureCommandsReportNotImplementedAndDoNotWriteAnything() {
-        for (String name : new String[]{"log", "diff", "branch", "checkout", "restore"}) {
+        for (String name : new String[]{"diff", "checkout", "restore"}) {
             Result result = execute(name);
             assertEquals(3, result.code(), name);
             assertEquals("Not implemented yet.", result.err().strip());
             assertTrue(result.out().isEmpty());
         }
-        assertEquals(3, execute("log", "--oneline").code());
+        assertEquals(1, execute("log", "--oneline").code());
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 

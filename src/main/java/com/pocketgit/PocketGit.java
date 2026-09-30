@@ -1,6 +1,11 @@
 package com.pocketgit;
 
 import com.pocketgit.cli.InitCommand;
+import com.pocketgit.cli.LogCommand;
+import com.pocketgit.cli.ShowCommand;
+import com.pocketgit.cli.BranchCommand;
+import com.pocketgit.services.LogService;
+import com.pocketgit.refs.BranchService;
 import com.pocketgit.cli.CatObjectCommand;
 import com.pocketgit.cli.AddCommand;
 import com.pocketgit.cli.CommitCommand;
@@ -35,7 +40,10 @@ public final class PocketGit {
         command.addSubcommand(new CommitCommand(workingDirectory, new CommitService()));
         command.addSubcommand(new ConfigCommand(workingDirectory));
         command.addSubcommand(new StatusCommand(workingDirectory, new StatusService()));
-        for (String name : List.of("log", "diff", "branch", "checkout", "restore")) {
+        command.addSubcommand(new LogCommand(workingDirectory, new LogService()));
+        command.addSubcommand(new ShowCommand(workingDirectory, new LogService()));
+        command.addSubcommand(new BranchCommand(workingDirectory, new BranchService()));
+        for (String name : List.of("diff", "checkout", "restore")) {
             CommandLine placeholder = new CommandLine(new PlaceholderCommand());
             placeholder.getCommandSpec().name(name);
             placeholder.getCommandSpec().usageMessage().description("Not implemented yet (future phase).");

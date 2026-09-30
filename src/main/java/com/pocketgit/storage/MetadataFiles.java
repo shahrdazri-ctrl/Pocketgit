@@ -86,6 +86,13 @@ public final class MetadataFiles {
             catch (AtomicMoveNotSupportedException unsupported) { throw new IOException("filesystem requires atomic metadata replacement", unsupported); }
             published = true;
         }
+        /** Exclusively publishes complete bytes; never replaces an existing reference. */
+        public void publishNew() throws IOException {
+            if (published || closed) throw new IllegalStateException("metadata replacement is closed or already published");
+            validateTarget(destination);
+            Files.createLink(destination, temporary);
+            published = true;
+        }
         @Override public void close() throws IOException { closed = true; Files.deleteIfExists(temporary); }
     }
 }

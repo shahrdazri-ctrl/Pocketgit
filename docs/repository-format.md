@@ -80,3 +80,7 @@ The reader rejects unknown versions/fields, missing or null required values, mal
 ## Commits and configuration — Phase 4
 
 After a commit, the attached branch ref contains the full Commit SHA-256 ID followed by LF. `HEAD` remains symbolic. `logs/HEAD` records old/new IDs, UTC timestamps, and the `commit` operation; the unborn old ID is 64 zeroes. Config settings use `user.name` and `user.email`. `commit.lock` and `index.lock` serialize commits and staging; `config.lock` serializes config updates. [Commits](commits.md) specifies payload schemas, bounds, atomic replacement, and crash recovery.
+
+## History and refs — Phase 6
+
+HEAD readers now recognize both symbolic `ref: refs/heads/NAME` and detached full Commit IDs, with optional final LF. Branch creation writes full IDs followed by LF and supports nested paths under `refs/heads/`. The initialized unborn `main` remains an empty file. Existing object, index, and reflog formats are unchanged. Commit/status still require symbolic HEAD, and checkout remains unimplemented. See [history and branches](history-and-branches.md) for ref APIs, name validation, locking, exclusive publication, hash prefixes, and crash limitations.
