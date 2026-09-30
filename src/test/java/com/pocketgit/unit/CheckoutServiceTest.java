@@ -84,6 +84,34 @@ class CheckoutServiceTest {
         assertThrows(IOException.class,()->failing.checkout(root,"feature")); same(before);
         assertEquals("main",new HeadManager(repo).readBranch()); assertTrue(Files.isDirectory(root.resolve("a")));
     }
+    @Test void failedDirectoryToFileCheckoutRestoresPrivateDirectoryPermissions() throws Exception {
+        assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
+        file("a","file"); commit("file"); branch(); Files.delete(root.resolve("a"));
+        file("a/sub/private","private contents"); commit("directory");
+        var privatePermissions=java.nio.file.attribute.PosixFilePermissions.fromString("rwx------");
+        Files.setPosixFilePermissions(root.resolve("a"),privatePermissions);
+        Files.setPosixFilePermissions(root.resolve("a/sub"),privatePermissions);
+        var before=state(); var failing=new CheckoutService(Clock.systemUTC(),()->{throw new IOException("injected failure");});
+        assertThrows(IOException.class,()->failing.checkout(root,"feature")); same(before);
+        assertEquals(privatePermissions,Files.getPosixFilePermissions(root.resolve("a")));
+        assertEquals(privatePermissions,Files.getPosixFilePermissions(root.resolve("a/sub")));
+    }
+    @Test void rollbackContinuesRestoringOtherFilesAfterDirectoryRecoveryFails() throws Exception {
+        Path outside=Files.createTempDirectory(root.getParent(),"rollback-outside");
+        try { Files.createSymbolicLink(root.resolve("probe"),outside); Files.delete(root.resolve("probe")); }
+        catch(IOException|UnsupportedOperationException failure) { assumeTrue(false,"symlinks unavailable"); }
+        file("a","file"); file("z","feature"); commit("file"); branch(); Files.delete(root.resolve("a"));
+        file("a/sub/private","private"); file("z","main"); commit("directory");
+        var failing=new CheckoutService(Clock.systemUTC(),()->{
+            Files.delete(root.resolve("a")); Files.createSymbolicLink(root.resolve("a"),outside);
+            throw new IOException("directory obstructed during recovery");
+        });
+        var failure=assertThrows(IOException.class,()->failing.checkout(root,"feature"));
+        assertTrue(failure.getMessage().contains("rollback incomplete"));
+        assertEquals("main",Files.readString(root.resolve("z")));
+        assertEquals("main",new HeadManager(repo).readBranch());
+        try(var paths=Files.list(outside)) { assertEquals(0,paths.count()); }
+    }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints={2,3,4})
     void failureAfterEachMetadataPublicationRestoresOriginalBytes(int failAt) throws Exception {

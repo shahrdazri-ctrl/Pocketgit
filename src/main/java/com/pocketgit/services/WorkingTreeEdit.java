@@ -28,12 +28,17 @@ public final class WorkingTreeEdit {
     private final Repository repository;
     private final Map<String, Data> originals = new LinkedHashMap<>();
     private final Map<String, Data> replacements = new LinkedHashMap<>();
-    private final Set<Path> originalDirectories = new HashSet<>();
+    private final Map<Path, Set<PosixFilePermission>> originalDirectories = new LinkedHashMap<>();
     private final Set<Path> createdDirectories = new HashSet<>();
     private final List<String> removals;
     private boolean applied;
 
     public WorkingTreeEdit(Repository repository, List<IndexEntry> writes, List<String> deletes) throws IOException {
+        this(repository, writes, deletes, MAX_BYTES);
+    }
+    /** A smaller preparation budget can be selected without raising the production maximum. */
+    public WorkingTreeEdit(Repository repository, List<IndexEntry> writes, List<String> deletes, long maxBytes) throws IOException {
+        if (maxBytes < 0 || maxBytes > MAX_BYTES) throw new IllegalArgumentException("invalid working-tree edit budget");
         this.repository = repository; removals = List.copyOf(deletes);
         var objects = new ObjectStore(repository);
         long total = 0;
@@ -41,26 +46,34 @@ public final class WorkingTreeEdit {
         for (String name : affected) {
             var path = safe(name); var attributes = PathUtils.attributesOrMissing(path);
             if (attributes != null && attributes.isRegularFile()) {
+                if (attributes.size() > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES) throw new IOException("working file exceeds edit limit: " + name);
+                requireBudget(total, attributes.size(), maxBytes);
                 byte[] bytes;
-                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES + 1); }
+                int readLimit = (int) Math.min(ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES, maxBytes - total);
+                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) { bytes = input.readNBytes(readLimit + 1); }
                 if (bytes.length > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES) throw new IOException("working file exceeds edit limit: " + name);
+                requireBudget(total, bytes.length, maxBytes);
                 originals.put(name, new Data(bytes, permissions(path))); total += bytes.length;
             } else if (attributes != null && !attributes.isDirectory()) throw new IOException("unsupported working file: " + name);
             for (Path parent = path.getParent(); parent.startsWith(repository.root()); parent = parent.getParent()) {
-                if (Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)) originalDirectories.add(parent);
+                if (Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !originalDirectories.containsKey(parent)) {
+                    originalDirectories.put(parent, permissions(parent));
+                }
                 if (parent.equals(repository.root())) break;
             }
         }
         for (var entry : writes) {
-            byte[] bytes = objects.readBlob(entry.blobHash()).content(); total += bytes.length;
-            if (total > MAX_BYTES) throw new IOException("working-tree edit exceeds 256 MiB backup and content limit");
+            byte[] bytes = objects.readBlob(entry.blobHash()).content();
+            requireBudget(total, bytes.length, maxBytes); total += bytes.length;
             var existing = originals.get(entry.path());
             var mode = existing == null || existing.permissions() == null ? defaultPermissions() : new HashSet<>(existing.permissions());
             mode.remove(PosixFilePermission.OWNER_EXECUTE); mode.remove(PosixFilePermission.GROUP_EXECUTE); mode.remove(PosixFilePermission.OTHERS_EXECUTE);
             if (entry.mode() == FileMode.EXECUTABLE_FILE) mode.add(PosixFilePermission.OWNER_EXECUTE);
             replacements.put(entry.path(), new Data(bytes, mode));
         }
-        if (total > MAX_BYTES) throw new IOException("working-tree edit exceeds 256 MiB backup and content limit");
+    }
+    private static void requireBudget(long total, long additional, long maxBytes) throws IOException {
+        if (additional > maxBytes - total) throw new IOException("working-tree edit exceeds " + maxBytes + " byte backup and content limit");
     }
     private Set<PosixFilePermission> defaultPermissions() {
         return new HashSet<>(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
@@ -116,8 +129,17 @@ public final class WorkingTreeEdit {
             try { if (Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) { try (var children = Files.list(directory)) { if (children.findAny().isEmpty()) Files.delete(directory); } } }
             catch (IOException problem) { if (failure == null) failure = problem; else failure.addSuppressed(problem); }
         }
-        var previousDirectories = new ArrayList<>(originalDirectories); previousDirectories.sort(Comparator.comparingInt(Path::getNameCount));
-        for (Path directory : previousDirectories) { if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) Files.createDirectory(directory); }
+        var previousDirectories = new ArrayList<>(originalDirectories.keySet()); previousDirectories.sort(Comparator.comparingInt(Path::getNameCount));
+        for (Path directory : previousDirectories) {
+            try {
+                PathUtils.safeWorkingPath(repository.root(), directory);
+                if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+                    Files.createDirectory(directory);
+                    var mode = originalDirectories.get(directory);
+                    if (mode != null && Files.getFileAttributeView(directory, PosixFileAttributeView.class) != null) Files.setPosixFilePermissions(directory, mode);
+                }
+            } catch (IOException problem) { if (failure == null) failure = problem; else failure.addSuppressed(problem); }
+        }
         for (var entry : originals.entrySet()) { try { write(entry.getKey(), entry.getValue()); } catch (IOException problem) { if (failure == null) failure = problem; else failure.addSuppressed(problem); } }
         if (failure != null) throw failure;
     }

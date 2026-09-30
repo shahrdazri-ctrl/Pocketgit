@@ -1,62 +1,96 @@
-# Repository format
+# PocketGit 1.0 repository format
 
-All metadata lives in a real `.pocketgit` directory under the working-tree root. Metadata symlinks are rejected during initialization and reinitialization. Files created in this phase are UTF-8; textual line endings are LF on all platforms.
+This document describes the on-disk formats and validation rules needed for an independent reader. PocketGit metadata is not Git-compatible. All paths below are relative to a real, non-symlink `.pocketgit` directory at the working-tree root. Text is UTF-8; generated textual metadata uses LF, with a final LF except canonical object JSON.
 
-| Path inside `.pocketgit` | Initial state |
+## Layout and initial state
+
+| Path | Contents/meaning |
 | --- | --- |
-| `HEAD` | `ref: refs/heads/main` followed by LF |
-| `index` | JSON object with integer `version: 1` and empty array `entries: []`, followed by LF |
-| `refs/heads/main` | Empty file representing an unborn branch |
-| `objects/` | Empty directory; objects use the format below |
-| `refs/heads/` | Directory for branch references |
-| `logs/` | Empty directory; commits create `logs/HEAD` |
-| `config` | JSON `{"user":{}}` with LF formatting and a final LF; no fabricated identity |
+| `HEAD` | Initially `ref: refs/heads/main\n`; current branch or detached Commit ID. |
+| `refs/heads/main` | Initially exactly empty, representing an unborn branch; later a full Commit ID plus LF. |
+| `index` | Strict JSON with `version: 1` and initially `entries: []`. |
+| `config` | Initially `{"user":{}}`, pretty-printed with LF; no invented identity. |
+| `objects/` | Immutable objects under two-character prefix directories. |
+| `refs/heads/` | Regular branch-ref files; nested branch names form subdirectories. |
+| `logs/HEAD` | Created by the first ref movement; commit and checkout reflog records. |
 
-Phase 4 adds initial `config`. Earlier repositories without it remain compatible: reading settings reports missing identity, and setting a key creates it. Reinitialization preserves existing metadata and does not add configuration to older repositories.
+`init [DIRECTORY]` requires an existing directory and uses its physical path. It claims a new `.pocketgit` directory exclusively and never overwrites existing metadata. Reinitialization checks required directories and regular HEAD/index files without parsing every value or repairing the repository. Incomplete/unsafe metadata is retained and reported; initialization is not crash-transactional. Older repositories lacking `config` remain readable and can create it with `config user.name`/`user.email`.
 
-## Initialization policy
+## HEAD and branch refs
 
-`init [DIRECTORY]` requires an existing directory; omitted arguments select the current working directory. Relative arguments resolve from the invocation's working directory. Physical paths are used for roots, including when the working directory was reached through a symlink.
+Symbolic HEAD is exactly `ref: refs/heads/NAME` with an optional final LF. Detached HEAD is exactly a 64-character lowercase SHA-256 Commit ID, also with optional LF. Readers understand detached HEAD; version 1.0's CLI does not expose detached checkout, and operations that require an attached branch reject it. HEAD reads are capped at 4 KiB.
 
-Existing metadata is never reset, repaired, or deleted by `init`. A structurally complete existing repository is reported as already initialized. Reinitialization requires real `objects`, `refs`, `refs/heads`, and `logs` directories plus regular `HEAD` and `index` files; it does not parse their contents or require the original `main` branch to remain present. Full integrity checking is deferred to Phase 9.
+A branch file contains either zero bytes (unborn) or one full lowercase hexadecimal Commit ID with optional final LF. Whitespace, extra lines, malformed IDs, symlinks, and nonregular files are errors. An empty missing branch is not equivalent to an unborn branch: a referenced branch must exist. New branch creation requires an existing commit and preserves HEAD/index/working files.
 
-If `.pocketgit` is a file, symlink, or incomplete directory, initialization fails with a clear error and preserves it. Inspect incomplete metadata before manually moving it aside and retrying; PocketGit does not make that decision for the user.
+Branch names support nested `feature/login` paths. Validation rejects null/blank names, `HEAD`, leading `-` or `/`, trailing `/`, `..`, `@{`, controls/whitespace, and `~ ^ : ? * [ \\`. Every `/` component must be nonempty, must not begin/end with `.`, and must not end with `.lock`. This prevents traversal and ambiguous metadata names.
 
-Initialization claims `.pocketgit` through atomic directory creation before writing new files exclusively. A second initializer never overwrites the first one's metadata; it may encounter incomplete structure while the first is writing and should be retried after the first finishes. Initialization is not a transactional or crash-durable operation yet: an interrupted write may leave partial metadata, and that metadata is deliberately retained. It is never advertised as successfully initialized by the failed invocation.
+## Object envelope, ID, and file path
 
-## Object database — Phase 2
-
-An object's canonical uncompressed representation is the following byte sequence:
+Canonical uncompressed bytes are:
 
 ```text
-ASCII(type) + ASCII(" ") + ASCII(decimal payload byte length) + NUL + payload
+ASCII(type) + ASCII(" ") + ASCII(decimalPayloadByteLength) + NUL + payload
 ```
 
-Types are exactly `blob`, `tree`, or `commit` in lowercase. Lengths use canonical nonnegative decimal notation: `0` or a nonzero digit followed by digits; no sign, leading zeros, whitespace, or extra fields. The NUL terminates the header. Payloads may contain any byte, including NUL. UTF-8 text is never assumed by the object layer. The stored header, including its delimiter, must fit within 128 bytes.
+Types are exactly lowercase `blob`, `tree`, or `commit`. Length is canonical unsigned decimal: `0`, or a nonzero digit followed by digits. Signs, leading zeros, whitespace, and extra fields are invalid. The header including NUL must fit in 128 bytes. The payload is arbitrary bytes and its declared byte length must exactly match.
 
-The ID is the lowercase hexadecimal SHA-256 of these canonical bytes, exactly 64 characters. Uppercase, abbreviated, and otherwise malformed IDs are rejected in Phase 2. An object with ID `abcdef...` lives at `objects/ab/cdef...`: the first two characters name a directory and the remaining 62 name its file.
+The ID is lowercase hexadecimal `SHA-256(canonicalBytes)`, exactly 64 characters. ID `abcdef…` maps to `objects/ab/cdef…`; the filename has exactly 62 hexadecimal characters after a two-character prefix directory. IDs in stored metadata are always full IDs. CLI history/restore can resolve a nonempty unique lowercase hexadecimal prefix; `cat-object` requires a full ID.
 
-The file contains exactly one zlib stream, produced by Java's default `DeflaterOutputStream`, holding the canonical bytes. Compression bytes do not participate in the ID and need not be identical across compressor implementations. Readers reject damaged or truncated streams, dictionaries, trailing bytes, concatenated streams, malformed headers, mismatched lengths, and hash mismatches. Metadata directories and object files must not be symlinks.
+An object file contains exactly one zlib stream holding the canonical bytes. Compression is Java's default `DeflaterOutputStream`; compressed bytes do not participate in identity and need not match across compressors. Reading must reject damaged/truncated streams, preset dictionaries, trailing bytes, concatenated streams, invalid headers, excess/missing payload bytes, and hash mismatches. Object files and their observed metadata paths must not be symlinks.
 
-For example, a Blob containing the 11 ASCII bytes `hello world` has canonical bytes `blob 11`, NUL, then `hello world`, and ID:
+For the 11 ASCII bytes `hello world`, canonical bytes are `blob 11`, NUL, then `hello world`. The ID is:
 
 ```text
 fee53a18d32820613c0527aa79be5cb30173c823a9b448fa4817767cc84c6f03
 ```
 
-Blob payloads are raw file bytes. Phase 4 defines canonical Tree and Commit JSON payloads in [commits](commits.md). Direct object writes leave the index and refs untouched.
+The default maximum payload is 67,108,864 bytes (64 MiB). The Java `ObjectStore` constructor can accept another bound; the CLI uses the default. Whole payloads are held in memory. A larger bound changes resource policy, not the format.
 
-## Object publication and bounds
+## Blob payload
 
-The writer creates a private `.tmp-*.object` file within the target prefix, writes compressed bytes, finishes the stream, and forces file contents before publication. `Files.createLink(destination, temporary)` publishes complete bytes without replacing any existing destination. A concurrent winner is read, verified, and compared before its ID is reused. Temporary files are removed after success or failure; any cleanup failure is reported. Existing corrupt objects are never silently rewritten.
+Blob payloads are raw file bytes, including NUL, invalid UTF-8, or empty content. No newline or encoding transformation is applied by staging, checkout, or restore. Only higher-level text inspection/diff decides whether bytes can be displayed as text.
 
-Hard-link support is required for publication. There is no fallback to a weaker overwrite-prone move. This protects readers from partial objects and makes duplicate writes safe. It is not a repository-wide transaction or a guarantee of directory durability across power loss; directory fsync, cleanup of crash-orphaned temporary files, object garbage collection, and repository-wide locks are future work. The store assumes that metadata directories are not maliciously renamed by another process during an operation; it rejects symlinks observed at access time.
+## Tree payload
 
-Default maximum payload: 64 MiB (67,108,864 bytes). `ObjectStore(repository, maxPayloadBytes)` can configure a different nonnegative bound; the CLI currently uses the default. Writes above the bound fail before creating objects. Reads bound decompressed canonical data before allocating the final payload, rejecting oversized streams and declared lengths. Whole objects are held in memory; streaming large-file support is future work. A larger configured bound changes resource policy, not the storage format or hash identity.
+Tree payloads are compact UTF-8 JSON without whitespace outside strings or a final LF. Property order is `entries`; each entry's order is `name`, `type`, `objectHash`, `mode`. For example, shown on multiple lines only for readability:
 
-## Staging index — Phase 3
+```json
+{
+  "entries": [
+    {"name":"README.md","type":"BLOB","objectHash":"<64 lowercase hex>","mode":"REGULAR_FILE"},
+    {"name":"src","type":"TREE","objectHash":"<64 lowercase hex>","mode":"DIRECTORY"}
+  ]
+}
+```
 
-`index` remains UTF-8 JSON with explicit LF line endings and a final LF. Its schema is:
+Entries sort by Java `String.compareTo` (UTF-16 code-unit lexicographic order), independent of filesystem traversal and locale. Names are single valid path components; duplicates are forbidden. Blob entries have `REGULAR_FILE` or `EXECUTABLE_FILE`, Tree entries have `DIRECTORY`, and Commit entries are forbidden. The empty Tree payload is exactly `{"entries":[]}`.
+
+Strings use Jackson 2.18.2 default JSON escaping with Unicode emitted as UTF-8. Semantic readers reject unknown/missing/null fields, duplicate keys, trailing JSON, invalid values, and payloads unequal to canonical reserialization, including reordered properties, whitespace, alternate escaping, or unsorted entries.
+
+## Commit payload
+
+Compact JSON uses this exact property order: `treeHash`, `parentHashes`, `authorName`, `authorEmail`, `timestamp`, `message`:
+
+```json
+{
+  "treeHash":"<root Tree ID>",
+  "parentHashes":[],
+  "authorName":"Jane Developer",
+  "authorEmail":"jane@example.com",
+  "timestamp":"2026-01-02T03:04:05Z",
+  "message":"Initial commit"
+}
+```
+
+Stored payloads omit the formatting/newlines above. All IDs are full lowercase SHA-256. The initial commit has no parents; normal later commits have the previous branch tip as the sole parent. The model permits ordered multiple parents for future merge work; duplicates are forbidden. Timestamps use canonical `Instant.toString()` with UTC `Z`. Messages must be nonblank and contain no NUL; multiline Unicode is preserved.
+
+Author name/email are nonblank, stripped of surrounding whitespace, and contain no control characters. Email additionally requires an interior `@` and no whitespace. Semantic decoding follows the same strict canonical rules as Trees and rejects noncanonical timestamp notation. A Commit must resolve to a Tree; each parent must resolve to a Commit.
+
+Tree expansion is bounded to 256 path components and 100,000 expanded nodes, counting the root and repeated DAG expansion. Traversal detects active-path cycles while allowing shared subtrees. [Commits](commits.md) describes construction and publication in detail.
+
+## Staging index
+
+The index is pretty-printed UTF-8 JSON with explicit LF and a final LF. Its strict schema is:
 
 ```json
 {
@@ -71,16 +105,40 @@ Default maximum payload: 64 MiB (67,108,864 bytes). `ObjectStore(repository, max
 }
 ```
 
-Entries sort by Java's lexicographic String order, independent of filesystem traversal. Duplicate paths and file/directory ancestor conflicts are rejected. Paths must be repository-relative and use `/`; they reject dot/empty components, metadata components, backslashes, colons, and control characters. IDs must be 64 lowercase hexadecimal characters. Modes are `REGULAR_FILE` or `EXECUTABLE_FILE`; staging uses POSIX execute permission bits where available and otherwise records regular files.
+Entries sort by Java lexicographic String order. Duplicate paths and file/directory ancestor conflicts are forbidden. IDs must refer to Blobs; file modes are `REGULAR_FILE` or `EXECUTABLE_FILE`. POSIX execute bits determine staging mode; platforms without POSIX permissions record regular files.
 
-The reader rejects unknown versions/fields, missing or null required values, malformed JSON, duplicate JSON keys, trailing values, numeric coercions, invalid IDs/modes/paths, and indexes above 16 MiB. Phase 1's empty index remains compatible. Field validation is separate from the future whole-repository integrity walk: normal staging creates verified Blobs before publishing references to them.
+Paths are repository-relative with `/` separators. Empty/absolute paths, dot or empty components, backslashes, colons, ASCII control characters/DEL, and case-insensitive `.pocketgit` components are invalid. Spaces and Unicode are supported. These rules do not make every name legal on every filesystem; callers must also satisfy their platform's filename and case constraints.
 
-`index.lock` is an exclusively created marker file held across load, Blob writes, and save. Readers can read an old or new complete index while another process updates it. The writer serializes a complete snapshot into a private `.index-*.tmp`, forces its contents, and atomically replaces `index`. It does not fall back to a non-atomic move. Locks and temporary files are removed on ordinary completion; process termination can leave them behind. See [staging](staging.md) for scope, ignore, symlink, and recovery policies. `add` does not update HEAD, branch refs, or reflogs.
+The reader rejects unknown versions/fields, missing/null values, duplicate JSON keys, trailing values, scalar coercions, invalid paths/IDs/modes, and indexes above 16 MiB. The index describes the next commit, independently of both HEAD and working files.
 
-## Commits and configuration — Phase 4
+## Configuration and ignore rules
 
-After a commit, the attached branch ref contains the full Commit SHA-256 ID followed by LF. `HEAD` remains symbolic. `logs/HEAD` records old/new IDs, UTC timestamps, and the `commit` operation; the unborn old ID is 64 zeroes. Config settings use `user.name` and `user.email`. `commit.lock` and `index.lock` serialize commits and staging; `config.lock` serializes config updates. [Commits](commits.md) specifies payload schemas, bounds, atomic replacement, and crash recovery.
+`config` is strict JSON with a `user` object holding optional `name` and `email` string/null values. Unknown fields, duplicate keys, trailing data, coercions, and files above 1 MiB are rejected. Missing settings are not fabricated; config commands update one key while preserving the other. `POCKETGIT_AUTHOR_NAME`/`POCKETGIT_AUTHOR_EMAIL` override the respective setting. Blank overrides are errors. These values affect new Commit payloads, not repository-format identity.
 
-## History and refs — Phase 6
+The working-tree root's `.pocketgitignore` is a regular UTF-8 file no larger than 1 MiB. Blank lines and leading `#` comments are ignored; whitespace is stripped. Literal basename patterns and `*`/`?` match path components; leading `/` or embedded `/` anchors at the root; trailing `/` matches directories and descendants. Matching is case-sensitive. Negation, `**`, escapes, and nested ignore files are unsupported. Already indexed paths remain tracked. `.pocketgit` is always excluded; `.git` needs an explicit rule if desired. [Staging](staging.md) defines examples and scope.
 
-HEAD readers now recognize both symbolic `ref: refs/heads/NAME` and detached full Commit IDs, with optional final LF. Branch creation writes full IDs followed by LF and supports nested paths under `refs/heads/`. The initialized unborn `main` remains an empty file. Existing object, index, and reflog formats are unchanged. Commit/status still require symbolic HEAD, and checkout remains unimplemented. See [history and branches](history-and-branches.md) for ref APIs, name validation, locking, exclusive publication, hash prefixes, and crash limitations.
+## Reflog
+
+`logs/HEAD` records one LF-terminated UTF-8 line per successful movement:
+
+```text
+<old ID or 64 zeroes> <new ID or 64 zeroes> <Instant timestamp> <operation>\n
+```
+
+Current CLI operations are `commit` and `checkout`. Zero IDs denote unborn endpoints. The log is bounded to 8 MiB. Appends prepare and replace the entire next log; invalid UTF-8 or a missing final LF fails before publication. Existing record semantics are not validated by `verify`. The log is observability, not automatic recovery; replay/reflog restoration is future work.
+
+## Locks, publication, and recovery
+
+| Lock | Operations |
+| --- | --- |
+| `index.lock` | Staging; paired with commit lock for commit, checkout, restore, and verify. |
+| `commit.lock` | Commit/ref publication and branch creation; paired operations acquire index first. |
+| `config.lock` | Local author-setting updates. |
+
+Locks are regular exclusively created markers, non-waiting, and removed on ordinary completion. They do not contain credentials and must not be interpreted as an automatically expiring lease. Confirm no PocketGit process is active, inspect and back up state, then manually remove an abandoned lock. Never remove a live lock.
+
+Objects are written to private `.tmp-*.object` files in their target prefix, compressed and forced, then published through a hard link without overwriting an existing object. A concurrent identical winner is read and verified. Metadata replacements use forced private files and atomic rename, with no non-atomic fallback; new refs use exclusive hard-link publication. Temporary names are implementation details, not valid object IDs.
+
+Objects precede ref publication. The index, ref, HEAD, and reflog are individually atomic, not one durable transaction. Ordinary checkout/restore failures attempt rollback, but abrupt termination or power loss can leave partial files, stale locks, and temporary files. Directory fsync, durable transaction recovery, repair, and garbage collection are not provided. Hard links and atomic replacement are filesystem requirements; observed symlinks are rejected. Cooperative locks do not protect against external edits or malicious metadata-directory replacement during operations.
+
+`verify` checks HEAD/refs, all stored objects (including unreachable ones), direct types/references, reachable graphs/snapshots, and index references. It reports illegal object filenames and corrupt data without repair. It does not validate configuration, ignore files, historic reflog semantics, or working-tree bytes. See [integrity and recovery](integrity.md), [checkout](checkout.md), and [diff/restore](diff-and-restore.md) for behavioral boundaries.

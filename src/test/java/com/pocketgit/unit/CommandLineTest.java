@@ -34,7 +34,17 @@ class CommandLineTest {
         }
     }
 
-    @Test void versionIsCorrect() { assertEquals("PocketGit 0.1.0", execute("--version").out().strip()); }
+    @Test void guiHasHelpRepositoryErrorsAndOptionalBuildGuidance() {
+        assertEquals(0,execute("gui","--help").code());
+        assertTrue(execute("gui").err().contains("not a PocketGit repository"));
+        if (PocketGit.class.getResource("/com/pocketgit/gui/GuiLauncher.class") == null) {
+            execute("init"); var result=execute("gui");assertEquals(1,result.code());
+            assertTrue(result.err().contains("not included"));assertTrue(result.err().contains("-Pgui"));
+            assertFalse(result.err().contains("\tat "));
+        }
+    }
+
+    @Test void versionIsCorrect() { assertEquals("PocketGit 1.0.0", execute("--version").out().strip()); }
 
     @Test void initAndRepeatHaveDistinctHonestOutput() {
         assertTrue(execute("init").out().startsWith("Initialized empty PocketGit repository in "));

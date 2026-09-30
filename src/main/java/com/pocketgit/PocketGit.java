@@ -1,6 +1,7 @@
 package com.pocketgit;
 
 import com.pocketgit.cli.InitCommand;
+import com.pocketgit.cli.GuiCommand;
 import com.pocketgit.cli.VerifyCommand;
 import com.pocketgit.validation.IntegrityChecker;
 import com.pocketgit.cli.DiffCommand;
@@ -53,6 +54,7 @@ public final class PocketGit {
         command.addSubcommand(new DiffCommand(workingDirectory, new DiffService()));
         command.addSubcommand(new RestoreCommand(workingDirectory, new RestoreService()));
         command.addSubcommand(new VerifyCommand(workingDirectory, new IntegrityChecker()));
+        command.addSubcommand(new GuiCommand(workingDirectory));
         command.setExecutionExceptionHandler((exception, cli, parsed) -> {
             String detail = exception.getMessage();
             cli.getErr().println("error: " + (detail == null ? "operation failed" : detail));

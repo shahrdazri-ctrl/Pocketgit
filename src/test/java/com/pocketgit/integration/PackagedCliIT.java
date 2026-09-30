@@ -35,11 +35,22 @@ class PackagedCliIT {
         assertEquals(0, help.code());
         assertTrue(help.output().contains("Usage: pocketgit"));
         assertTrue(help.output().contains("restore"));
-        assertEquals("PocketGit 0.1.0", run(temp, "--version").output().strip());
+        assertEquals("PocketGit 1.0.0", run(temp, "--version").output().strip());
         Result placeholder = run(temp, "diff");
         assertEquals(1, placeholder.code());
         assertTrue(placeholder.output().contains("not a PocketGit repository"));
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
+    }
+
+    @Test void packagedGuiHelpAndDefaultArtifactGuidanceAreClean() throws Exception {
+        assertEquals(0,run(temp,"gui","--help").code());
+        assertEquals(1,run(temp,"gui").code());
+        try (var jar=new java.util.jar.JarFile(System.getProperty("pocketgit.jar"))) {
+            if(jar.getEntry("com/pocketgit/gui/GuiLauncher.class")==null) {
+                Path root=Files.createDirectory(temp.resolve("gui-repo"));assertEquals(0,run(root,"init").code());
+                var missing=run(root,"gui");assertEquals(1,missing.code());assertTrue(missing.output().contains("not included"));assertFalse(missing.output().contains("\tat "));
+            }
+        }
     }
 
     @Test void realInitWorkflowPreservesMetadataAndFindsNestedRepository() throws Exception {
