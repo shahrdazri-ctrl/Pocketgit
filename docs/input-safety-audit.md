@@ -11,6 +11,8 @@ This follow-up audited `6e98dc9`, including the previous [resource and recovery 
 | Portable branch collisions | Linux accepted both `Feature` and `feature`, and both `Team/one` and `team/two`. `verify` incorrectly reported the resulting nonportable namespace as valid. | Creation checks all ref and directory spellings before mutation. Listing and verification reject manually introduced aliases. Case-mismatched reads, updates, and checkout fail on every platform. Native Unicode normalization can reuse an existing physical directory. |
 | Unescaped path controls | `status` and `add` printed a filename containing the C1 control `U+009B` directly. Diff headers and restore confirmations used the same unsafe presentation pattern. | Every affected CLI label uses shared escaping, including Unicode bidi controls. Authors, branch labels, config values, init paths, and pretty object inspection receive the same protection. Stored names, object IDs, and restored bytes stay exact. |
 
+Case checks compare directory entries directly. Java's `toRealPath(NOFOLLOW_LINKS)` can retain the requested spelling on Unix, so it cannot reliably establish stored case. Namespace scans decode their known paths directly, and creation reuses the scanned parent spellings. Listing and integrity verification avoid a directory scan for each ref.
+
 ## Regression coverage
 
 - A time-bounded adversarial wildcard test and 2,000 seeded comparisons against an independent dynamic-programming glob oracle.
@@ -28,16 +30,22 @@ Local validation on 2026-09-30 used OpenJDK 21.0.12.1 and Maven 3.9.11 on Linux:
 | --- | --- |
 | `mvn clean verify` | 441 unit tests and 32 packaged-process integration tests; no failures, errors, or skips. |
 | `mvn -Pgui clean verify` | The same 473 tests passed against the GUI artifact; no failures, errors, or skips. |
-| JaCoCo core line coverage, both builds | 2,436 of 2,601 lines covered: 93.66%, above the 80% gate. |
+| JaCoCo core line coverage, both builds | 2,450 of 2,614 lines covered: 93.73%, above the 80% gate. |
 | Selected SpotBugs checks, both builds | Zero findings or analysis errors. |
 | Full 64 MiB file workflow with a 96 MiB heap | Passed in both packaged integration suites. |
 | Executable `examples/demo.sh` | Snapshot, diff, branch, checkout, historical/index restore, clean status, and integrity verification passed. |
 | Actual CI JavaFX scene script | Two branches, two commits, selected details, and 1,001 changed files displayed with bounded virtual rows. Metadata manifests were byte-identical before and after. |
 | Versioned CLI and GUI release checksums | Both SHA-256 manifests matched their saved artifacts. |
+| Repeated GUI packaging after full verification | `mvn -Pgui -DskipTests package` produced a byte-identical runnable JAR. |
 | Documentation links and whitespace | No broken local Markdown links; `git diff --check` passed. |
 
 The original hostile wildcard probe now returns correctly in approximately 0.04 seconds including JVM startup, compared with the earlier three-second timeout. This is one local observation, not a general throughput guarantee. The regression suite also checks an independent glob oracle and the existing checkout recovery, corruption, and snapshot round-trip cases.
 
-Native CI results are recorded after the pushed revision completes the supported matrix.
+[GitHub Actions run 36782016521](https://github.com/shahrdazri-ctrl/Pocketgit/actions/runs/36782016521)
+completed successfully for source commit `312a736993a1b545c7c4204554384830e97687c5`.
+All four jobs passed: CLI verification on Ubuntu, Windows, and macOS, plus the
+Linux GUI build and actual JavaFX scene. The preceding input-safety commit also
+passed [all four jobs](https://github.com/shahrdazri-ctrl/Pocketgit/actions/runs/36781079565).
+The final documentation update changes no code or build configuration.
 
 The fixes bound per-rule wildcard matching; they do not promise constant time for arbitrarily many ignore rules. Full integrity verification still scales with the object database. Multi-file crash durability and protection against malicious concurrent directory renames remain the documented limits of the current version.
