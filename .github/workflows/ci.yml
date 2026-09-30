@@ -16,14 +16,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: mvn -B -ntp clean verify
-      - uses: actions/upload-artifact@v4
+      - name: Verify CLI
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee "$RUNNER_TEMP/pocketgit-build.log"
+      - name: Report Maven and test failures
+        if: failure()
+        run: python scripts/report-ci-failures.py
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
           name: pocketgit-${{ matrix.os }}
@@ -34,17 +41,25 @@ jobs:
             target/failsafe-reports/
             target/site/jacoco/
             target/spotbugsXml.xml
+            ${{ runner.temp }}/pocketgit-build.log
   gui:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: mvn -B -ntp -Pgui clean verify
+      - name: Verify GUI
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -ntp -Pgui clean verify 2>&1 | tee "$RUNNER_TEMP/pocketgit-build.log"
+      - name: Report Maven and test failures
+        if: failure()
+        run: python scripts/report-ci-failures.py
       - name: Exercise the JavaFX scene
         shell: bash
         run: |
@@ -79,7 +94,7 @@ jobs:
           timeout 60 java -Djavafx.cachedir="$GITHUB_WORKSPACE/target/gui-smoke/native" -Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw -Dpocketgit.gui.smoke=true -Dpocketgit.gui.smoke.expectedFiles=1001 -Dpocketgit.gui.screenshot="$screenshot" -cp "$artifact:$monocle" com.pocketgit.PocketGit gui
           find .pocketgit -type f -exec sha256sum {} + | LC_ALL=C sort > "$GITHUB_WORKSPACE/target/gui-smoke/after.sha256"
           cmp "$GITHUB_WORKSPACE/target/gui-smoke/before.sha256" "$GITHUB_WORKSPACE/target/gui-smoke/after.sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         if: always()
         with:
           name: pocketgit-gui-linux
@@ -92,3 +107,4 @@ jobs:
             target/failsafe-reports/
             target/site/jacoco/
             target/spotbugsXml.xml
+            ${{ runner.temp }}/pocketgit-build.log

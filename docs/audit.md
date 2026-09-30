@@ -49,3 +49,9 @@ Human-readable diff/log output escapes controls, including displayed carriage re
 Ordinary-failure rollback is stronger, but multi-file checkout is still not crash-atomic. External editors do not participate in PocketGit locks, so revalidation cannot eliminate all races with edits after the final check. Power loss, process termination, or obstructed recovery can require manual inspection. These are documented design limits rather than claims of durable transaction recovery.
 
 Local results are Linux results. Windows/macOS CI is configured; no native-platform run or remote CI success is claimed without observing it. No native installer, license change, GitHub release, or tagged publication was performed by this audit.
+
+## Remote CI follow-up
+
+After pushing the audited changes, [run 36695291192](https://github.com/shahrdazri-ctrl/Pocketgit/actions/runs/36695291192) reported failures in its macOS and Windows Maven jobs. The preceding phase-10 run also failed on these platforms. Linux-local verification is therefore not a completed cross-platform readiness claim. Full remote diagnostics are currently blocked by the cloud network policy for `api.github.com`; an existing GitHub API binding was detected, and the missing domain was saved in the environment draft. The job failure summaries alone do not identify a root cause.
+
+That run also reported deprecated Node 20 actions. CI was updated independently to the official v5 actions, pinned to the commit IDs resolved from their upstream tags, removing that known tooling issue without claiming it fixes the Maven failures.
