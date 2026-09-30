@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1–8 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, accurate staged/unstaged/untracked status, history traversal, branch creation/listing, and commit inspection by unique hash prefix. Safe checkout, unified text/binary diff reporting, and byte-exact file restore are also implemented.
+Phases 1–9 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, accurate staged/unstaged/untracked status, history traversal, branch creation/listing, and commit inspection by unique hash prefix. Safe checkout, unified text/binary diff reporting, and byte-exact file restore are also implemented.
 
 ## Build and test
 
@@ -126,6 +126,14 @@ pocketgit restore --commit COMMIT_PREFIX README.md
 
 Restore replaces the named working file and discards its unstaged changes. The index and refs stay unchanged. See [diff and restore](docs/diff-and-restore.md) for binary behavior and resource bounds.
 
+## Verify repository integrity
+
+```bash
+pocketgit verify
+```
+
+Verification checks refs, all object hashes and canonical payloads, reachable graphs, and index references without repairing data. See [integrity and reliability](docs/integrity.md) for lock recovery and coverage policy.
+
 ## Implementation notes
 
 - [Architecture](docs/architecture.md)
@@ -142,4 +150,4 @@ Restore replaces the named working file and discards its unstaged changes. The i
 - [History, references, and branches](docs/history-and-branches.md)
 - [Phase 6 validation](docs/phase-6-validation.md)
 
-Safe branch checkout is implemented with staged/unstaged/untracked conflict protection and ordinary-failure rollback. The next phase is repository integrity verification and reliability. Subsequent work follows the master prompt in order.
+Safe branch checkout is implemented with staged/unstaged/untracked conflict protection and ordinary-failure rollback. Integrity verification and reliability checks are implemented. The next phase is release packaging and portfolio polish. Subsequent work follows the master prompt in order.
