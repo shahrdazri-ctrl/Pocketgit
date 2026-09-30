@@ -26,7 +26,7 @@ class PackagedCliIT {
                 "-Dfile.encoding=UTF-8"));
         command.addAll(vmOptions);
         command.addAll(List.of("-jar", Path.of(System.getProperty("pocketgit.jar")).toAbsolutePath().toString()));
-        command.addAll(List.of(args));
+        command.addAll(CliArguments.portable(temp, args));
         Path output = temp.resolve("process-output.txt");
         Process process = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(true)
                 .redirectOutput(output.toFile()).start();
@@ -49,9 +49,10 @@ class PackagedCliIT {
     }
 
     @Test void redirectedTextIsUtf8AndPlainEvenWithLegacyEncodingAndAnsiEnabled() throws Exception {
-        var legacy = List.of("-Dfile.encoding=US-ASCII", "-Dsun.stdout.encoding=US-ASCII", "-Dsun.stderr.encoding=US-ASCII", "-Dpicocli.ansi=true");
+        var legacy = List.of("-Dsun.stdout.encoding=US-ASCII", "-Dsun.stderr.encoding=US-ASCII", "-Dpicocli.ansi=true");
         assertEquals(0, run(temp, legacy, "init").code());
         assertEquals(0, run(temp, legacy, "config", "user.name", "Jane 日本語").code());
+        assertTrue(Files.readString(temp.resolve(".pocketgit/config")).contains("Jane 日本語"));
         assertEquals("Jane 日本語", run(temp, legacy, "config", "user.name").output().strip());
         Result help = run(temp, legacy, "--help");
         assertEquals(0, help.code());
@@ -61,6 +62,13 @@ class PackagedCliIT {
         assertEquals(1, error.code());
         assertTrue(error.output().contains("日本語"), error.output());
         assertFalse(error.output().contains("\u001b"));
+        assertEquals(0, run(temp, legacy, "config", "user.email", "jane@example.com").code());
+        String message = "Subject 日本語\n\nBody with a \\\\ and \"quote\"";
+        assertEquals(0, run(temp, legacy, "commit", "--allow-empty", "-m", message).code());
+        Result history = run(temp, legacy, "log");
+        assertEquals(0, history.code());
+        assertTrue(history.output().contains("Subject 日本語"));
+        assertTrue(history.output().contains("Body with a \\\\ and \"quote\""));
     }
 
     @Test void packagedGuiHelpAndDefaultArtifactGuidanceAreClean() throws Exception {

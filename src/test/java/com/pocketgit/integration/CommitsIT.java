@@ -20,7 +20,7 @@ class CommitsIT {
         String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
         var command = new ArrayList<>(List.of(Path.of(System.getProperty("java.home"), "bin", executable).toString(),
                 "-Dfile.encoding=UTF-8", "-jar", Path.of(System.getProperty("pocketgit.jar")).toAbsolutePath().toString()));
-        command.addAll(List.of(args));
+        command.addAll(CliArguments.portable(temp, args));
         Path out = temp.resolve("stdout"), err = temp.resolve("stderr");
         var builder = new ProcessBuilder(command).directory(cwd.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
         builder.environment().remove("POCKETGIT_AUTHOR_NAME"); builder.environment().remove("POCKETGIT_AUTHOR_EMAIL");

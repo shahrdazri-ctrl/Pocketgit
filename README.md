@@ -95,6 +95,8 @@ To try the same workflow without choosing a directory, run `sh examples/demo.sh`
 
 Use `pocketgit COMMAND --help` for syntax. Exit codes are 0 for success/help, 1 for execution failures, and 2 for invalid arguments. `POCKETGIT_AUTHOR_NAME` and `POCKETGIT_AUTHOR_EMAIL` override their respective local author settings. Missing identity produces an actionable error.
 
+PocketGit accepts UTF-8 `@argument-file` input, including quoted values and multiline messages. On Windows with Java 21, use this route for text outside the active Windows code page; see the [Unicode argument example](docs/release.md#unicode-arguments-on-windows-with-java-21).
+
 ## Architecture
 
 ```mermaid
