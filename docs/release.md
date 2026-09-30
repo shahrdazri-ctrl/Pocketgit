@@ -2,6 +2,8 @@
 
 CLI text is UTF-8 on every platform. Redirected help is plain text; interactive help can use terminal colors. Displayed lines can use native line endings, while stored repository formats and raw `cat-object` payload bytes remain exact.
 
+The baseline release is a self-contained CLI JAR requiring Java 21+. Native installers and desktop packages are optional future additions. No release is automatically published by these instructions.
+
 ## Unicode arguments on Windows with Java 21
 
 The Windows Java 21 launcher converts direct arguments through the active Windows code page. Characters outside that page can reach the application as `?`. Use PocketGit's argument-file support for such text: save `identity.args` as UTF-8, with the following contents, then run `pocketgit @identity.args` (or `java -jar target/pocketgit.jar @identity.args`):
@@ -13,8 +15,6 @@ user.name
 ```
 
 Argument files support quoted values and escaped newlines, so they can also hold complete `commit -m` commands. Use a filename representable in the active code page. Java 21 defaults to UTF-8 for these files; keep `file.encoding=UTF-8` if setting JVM encoding properties explicitly. This avoids changing system-wide Windows locale settings.
-
-The baseline release is a self-contained CLI JAR requiring Java 21+. Native installers and desktop packages are optional future additions. No release is automatically published by these instructions.
 
 ## CLI build
 
