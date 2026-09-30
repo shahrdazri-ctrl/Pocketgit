@@ -16,10 +16,16 @@ class PackagedCliIT {
     private record Result(int code, String output) {}
 
     private Result run(Path cwd, String... args) throws Exception {
+        return run(cwd, List.of(), args);
+    }
+
+    private Result run(Path cwd, List<String> vmOptions, String... args) throws Exception {
         String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
         List<String> command = new ArrayList<>(List.of(
                 Path.of(System.getProperty("java.home"), "bin", executable).toString(),
-                "-Dfile.encoding=UTF-8", "-jar", Path.of(System.getProperty("pocketgit.jar")).toAbsolutePath().toString()));
+                "-Dfile.encoding=UTF-8"));
+        command.addAll(vmOptions);
+        command.addAll(List.of("-jar", Path.of(System.getProperty("pocketgit.jar")).toAbsolutePath().toString()));
         command.addAll(List.of(args));
         Path output = temp.resolve("process-output.txt");
         Process process = new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(true)
@@ -33,13 +39,28 @@ class PackagedCliIT {
     @Test void packagedJarSupportsHelpVersionAndCleanRepositoryErrors() throws Exception {
         Result help = run(temp, "--help");
         assertEquals(0, help.code());
-        assertTrue(help.output().contains("Usage: pocketgit"));
+        assertTrue(help.output().contains("Usage: pocketgit"), help.output());
         assertTrue(help.output().contains("restore"));
         assertEquals("PocketGit 1.0.0", run(temp, "--version").output().strip());
         Result placeholder = run(temp, "diff");
         assertEquals(1, placeholder.code());
         assertTrue(placeholder.output().contains("not a PocketGit repository"));
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
+    }
+
+    @Test void redirectedTextIsUtf8AndPlainEvenWithLegacyEncodingAndAnsiEnabled() throws Exception {
+        var legacy = List.of("-Dfile.encoding=US-ASCII", "-Dsun.stdout.encoding=US-ASCII", "-Dsun.stderr.encoding=US-ASCII", "-Dpicocli.ansi=true");
+        assertEquals(0, run(temp, legacy, "init").code());
+        assertEquals(0, run(temp, legacy, "config", "user.name", "Jane 日本語").code());
+        assertEquals("Jane 日本語", run(temp, legacy, "config", "user.name").output().strip());
+        Result help = run(temp, legacy, "--help");
+        assertEquals(0, help.code());
+        assertTrue(help.output().contains("Usage: pocketgit"));
+        assertFalse(help.output().contains("\u001b"));
+        Result error = run(temp, legacy, "add", "missing-日本語");
+        assertEquals(1, error.code());
+        assertTrue(error.output().contains("日本語"), error.output());
+        assertFalse(error.output().contains("\u001b"));
     }
 
     @Test void packagedGuiHelpAndDefaultArtifactGuidanceAreClean() throws Exception {

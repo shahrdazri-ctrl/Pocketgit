@@ -1,5 +1,7 @@
 # Release and distribution
 
+CLI text is UTF-8 on every platform. Redirected help is plain text; interactive help can use terminal colors. Displayed lines can use native line endings, while stored repository formats and raw `cat-object` payload bytes remain exact.
+
 The baseline release is a self-contained CLI JAR requiring Java 21+. Native installers and desktop packages are optional future additions. No release is automatically published by these instructions.
 
 ## CLI build

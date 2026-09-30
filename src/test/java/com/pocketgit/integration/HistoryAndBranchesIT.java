@@ -25,7 +25,9 @@ class HistoryAndBranchesIT {
         var process=builder.start();
         boolean finished=process.waitFor(20, TimeUnit.SECONDS); if (!finished) process.destroyForcibly();
         assertTrue(finished,"CLI must finish within 20 seconds");
-        return new Result(process.exitValue(),Files.readString(out),Files.readString(err));
+        // Compare displayed text across native console line endings. Repository bytes below
+        // still use exact readString/readAllBytes assertions.
+        return new Result(process.exitValue(),Files.readString(out).replace("\r\n", "\n"),Files.readString(err).replace("\r\n", "\n"));
     }
     private Result success(Path root,String... args) throws Exception {
         var result=run(root,args); assertEquals(0,result.code(),result.err()); assertEquals("",result.err()); return result;

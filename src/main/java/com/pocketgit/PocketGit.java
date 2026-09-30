@@ -31,6 +31,9 @@ import com.pocketgit.validation.IntegrityChecker;
 import picocli.CommandLine;
 
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 public final class PocketGit {
@@ -74,6 +77,14 @@ public final class PocketGit {
     }
 
     public static void main(String[] args) {
-        System.exit(commandLine(Path.of("")).execute(args));
+        CommandLine command = commandLine(Path.of(""));
+        command.setOut(
+                new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true));
+        command.setErr(
+                new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true));
+        if (System.console() == null) {
+            command.setColorScheme(CommandLine.Help.defaultColorScheme(CommandLine.Help.Ansi.OFF));
+        }
+        System.exit(command.execute(args));
     }
 }
