@@ -54,7 +54,7 @@
         <executions><execution><phase>verify</phase><goals><goal>check</goal></goals></execution></executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.1.0</version>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.2.0</version>
         <executions><execution><id>versioned-release-artifact</id><phase>verify</phase><goals><goal>run</goal></goals>
           <configuration><target><copy file="${project.build.directory}/${project.build.finalName}.jar" tofile="${project.build.directory}/${project.build.finalName}-${project.version}.jar"/><checksum file="${project.build.directory}/${project.build.finalName}-${project.version}.jar" algorithm="SHA-256" fileext=".sha256" format="MD5SUM"/></target></configuration>
         </execution></executions>
