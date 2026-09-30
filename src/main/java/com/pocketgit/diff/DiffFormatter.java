@@ -23,11 +23,8 @@ public final class DiffFormatter {
 
     public void write(List<DiffResult> results, Appendable text) throws IOException {
         for (var result : results) {
-            text.append("diff --pocketgit a/")
-                    .append(result.path())
-                    .append(" b/")
-                    .append(result.path())
-                    .append('\n');
+            String path = TerminalText.escapeLabel(result.path());
+            text.append("diff --pocketgit a/").append(path).append(" b/").append(path).append('\n');
             if (!result.oldExists())
                 text.append("new file mode ").append(mode(result.newMode())).append('\n');
             else if (!result.newExists())
@@ -39,16 +36,12 @@ public final class DiffFormatter {
                         .append(mode(result.newMode()))
                         .append('\n');
             if (result.binary()) {
-                text.append("Binary files differ: ").append(result.path()).append('\n');
+                text.append("Binary files differ: ").append(path).append('\n');
                 continue;
             }
             if (result.hunks().isEmpty()) continue;
-            text.append("--- ")
-                    .append(result.oldExists() ? "a/" + result.path() : "/dev/null")
-                    .append('\n');
-            text.append("+++ ")
-                    .append(result.newExists() ? "b/" + result.path() : "/dev/null")
-                    .append('\n');
+            text.append("--- ").append(result.oldExists() ? "a/" + path : "/dev/null").append('\n');
+            text.append("+++ ").append(result.newExists() ? "b/" + path : "/dev/null").append('\n');
             for (var hunk : result.hunks()) {
                 text.append("@@ -")
                         .append(Integer.toString(hunk.oldStart()))

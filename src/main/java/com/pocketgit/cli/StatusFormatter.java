@@ -1,6 +1,8 @@
 package com.pocketgit.cli;
 
 import com.pocketgit.model.RepositoryStatus;
+import com.pocketgit.util.TerminalText;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +12,7 @@ import java.util.TreeMap;
 public final class StatusFormatter {
     public String format(RepositoryStatus status, boolean showIgnored) {
         var lines = new ArrayList<String>();
-        lines.add("On branch " + status.branch());
+        lines.add("On branch " + TerminalText.escapeLabel(status.branch()));
         if (!status.hasCommits()) lines.add("No commits yet");
         var staged = new TreeMap<String, String>();
         status.stagedNew().forEach(path -> staged.put(path, "new file:   "));
@@ -29,14 +31,18 @@ public final class StatusFormatter {
         }
         return String.join("\n", lines) + "\n";
     }
+
     private void changes(List<String> lines, String title, Map<String, String> entries) {
         if (entries.isEmpty()) return;
-        lines.add(""); lines.add(title);
-        entries.forEach((path, label) -> lines.add("  " + label + path));
+        lines.add("");
+        lines.add(title);
+        entries.forEach((path, label) -> lines.add("  " + label + TerminalText.escapeLabel(path)));
     }
+
     private void paths(List<String> lines, String title, List<String> paths) {
         if (paths.isEmpty()) return;
-        lines.add(""); lines.add(title);
-        paths.forEach(path -> lines.add("  " + path));
+        lines.add("");
+        lines.add(title);
+        paths.forEach(path -> lines.add("  " + TerminalText.escapeLabel(path)));
     }
 }

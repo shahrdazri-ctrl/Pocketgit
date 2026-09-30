@@ -5,6 +5,7 @@ import com.pocketgit.refs.*;
 import com.pocketgit.repository.*;
 import com.pocketgit.services.*;
 import com.pocketgit.storage.*;
+import com.pocketgit.util.PathUtils;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -56,6 +57,7 @@ public final class IntegrityChecker {
         }
         try {
             files.validateTarget(repository.headsDirectory().resolve("validation"));
+            var names = new ArrayList<String>();
             try (var paths = Files.walk(repository.headsDirectory())) {
                 for (Path path : paths.sorted().toList()) {
                     if (path.equals(repository.headsDirectory())) continue;
@@ -65,6 +67,7 @@ public final class IntegrityChecker {
                                     .relativize(path)
                                     .toString()
                                     .replace(path.getFileSystem().getSeparator(), "/");
+                    names.add(branch);
                     try {
                         RefNameValidator.validateBranch(branch);
                         var attributes =
@@ -79,6 +82,11 @@ public final class IntegrityChecker {
                         errors.add("ref " + branch + ": " + bad.getMessage());
                     }
                 }
+            }
+            try {
+                PathUtils.validateSnapshotPaths(names);
+            } catch (IllegalArgumentException collision) {
+                errors.add("refs: " + collision.getMessage());
             }
         } catch (IOException | java.io.UncheckedIOException bad) {
             errors.add("refs: " + bad.getMessage());

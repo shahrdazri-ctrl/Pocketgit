@@ -3,10 +3,12 @@ package com.pocketgit.unit;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.pocketgit.cli.CommitFormatter;
+import com.pocketgit.cli.StatusFormatter;
 import com.pocketgit.diff.DiffEngine;
 import com.pocketgit.diff.DiffFormatter;
 import com.pocketgit.model.Commit;
 import com.pocketgit.model.FileMode;
+import com.pocketgit.model.RepositoryStatus;
 import com.pocketgit.services.LogService;
 import com.pocketgit.util.TerminalText;
 
@@ -59,5 +61,62 @@ class TerminalOutputTest {
         assertEquals("\tnaïve 日本語", TerminalText.escape("\tnaïve 日本語"));
         assertEquals("hello\\u000d", TerminalText.escape("hello\r"));
         assertEquals("\\u009b31m", TerminalText.escape("\u009b31m"));
+    }
+
+    @Test
+    void labelsEscapeLineBreaksAndDirectionalControlsPreservingOrdinaryUnicode() {
+        assertEquals(
+                "naïve 😀\\u000a\\u0009\\u202e", TerminalText.escapeLabel("naïve 😀\n\t\u202e"));
+        assertEquals(
+                "\\u061c\\u200e\\u200f\\u202a\\u202b\\u202c\\u202d\\u202e\\u2066\\u2067\\u2068\\u2069",
+                TerminalText.escape(
+                        "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"));
+        assertEquals("\tline\n", TerminalText.escape("\tline\n"));
+    }
+
+    @Test
+    void everyStatusCategoryEscapesUntrustedPathsAndBranchLabels() {
+        String control = "\u009b2J", bidi = "\u202e";
+        var status =
+                new RepositoryStatus(
+                        "branch" + bidi,
+                        true,
+                        List.of("added" + control),
+                        List.of("staged" + bidi),
+                        List.of("deleted" + control),
+                        List.of("working" + bidi),
+                        List.of("missing" + control),
+                        List.of("new" + control),
+                        List.of("ignored" + bidi + "/"));
+        String output = new StatusFormatter().format(status, true);
+        assertFalse(output.contains(control));
+        assertFalse(output.contains(bidi));
+        assertTrue(output.contains("On branch branch\\u202e"));
+        for (String path :
+                List.of(
+                        "added\\u009b2J",
+                        "staged\\u202e",
+                        "deleted\\u009b2J",
+                        "working\\u202e",
+                        "missing\\u009b2J",
+                        "new\\u009b2J",
+                        "ignored\\u202e/")) assertTrue(output.contains(path), path);
+    }
+
+    @Test
+    void authorsAndCommitMessagesCannotHideDirectionalText() {
+        var commit =
+                new Commit(
+                        "a".repeat(64),
+                        List.of(),
+                        "name\u202e",
+                        "person\u2066@example.com",
+                        Instant.EPOCH,
+                        "message\u202e");
+        String output =
+                new CommitFormatter().format(new LogService.Entry("b".repeat(64), commit), true);
+        assertTrue(output.contains("Author: name\\u202e <person\\u2066@example.com>"));
+        assertTrue(output.contains("message\\u202e"));
+        assertFalse(output.contains("\u202e"));
     }
 }

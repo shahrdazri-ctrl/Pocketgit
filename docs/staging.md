@@ -13,7 +13,7 @@ Exactly one path argument is required. File and directory arguments resolve from
 
 New and modified regular files create/update entries. Unchanged files are verified and retain their existing Blob IDs; an unchanged index is not rewritten. Missing indexed files under the requested scope are removed from the index, staging their deletion. An absent directory can stage deletion of its indexed descendants. Missing paths that have no entries fail clearly. Entries outside the scope are preserved, except conflicting ancestors in file/directory replacements: staging `a/child` after indexed file `a` becomes a directory necessarily removes the old `a` entry.
 
-The `.pocketgit` metadata name is reserved in every path component, case-insensitively, and is always excluded from scans. Index paths use `/` separators and reject absolute paths, dot segments, empty segments, backslashes, colons, and control characters. Spaces and Unicode are supported. Case-sensitive filename collisions and other platform-specific filename restrictions must be addressed before cross-platform checkout in later phases.
+The `.pocketgit` metadata name is reserved in every path component, case-insensitively, and is always excluded from scans. Index paths use `/` separators and reject absolute paths, dot segments, empty segments, backslashes, colons, ASCII control characters, Windows device names, and nonportable punctuation or trailing dots/spaces. Spaces and Unicode are supported. Snapshot paths reject case and Unicode-normalization collisions, including differently spelled parent directories, before index publication. Human-readable output escapes terminal and Unicode directional controls while retaining the exact stored filename.
 
 Requested paths are checked component by component before normalization. Symlinks canceled by `..` are still rejected, and paths may never step outside the repository. Recursive traversal does not follow symlinks. Unignored symlinks and special files fail the operation; explicitly requested symlinks always fail. Untracked files already excluded by an ignore rule are skipped without reading their contents. POSIX executable permission bits map to `EXECUTABLE_FILE`; files on platforms without POSIX attributes use `REGULAR_FILE`.
 
@@ -39,12 +39,14 @@ Supported grammar:
 | Blank line or leading `#` | Ignored |
 | Literal without `/`, e.g. `.env` | Matches a basename at any depth |
 | `*` | Zero or more characters within one path component |
-| `?` | One character within one path component |
+| `?` | One Unicode code point within one path component, including an emoji |
 | Trailing `/` | Matches directories and their descendants, not a regular file of that name |
 | Leading `/`, e.g. `/root.txt` | Anchors a pattern at the repository root |
 | Slash inside a pattern, e.g. `src/generated/` | Root-relative pattern |
 
 Matching is case-sensitive. Leading/trailing whitespace is stripped. Regex characters such as `[` are literal. Negation (`!`), recursive globstars (`**`), and backslash escapes are unsupported and produce a clear error; there is no claim of full Git wildmatch compatibility. Already indexed files are still updated or removed even if new ignore rules match them. `.pocketgitignore` itself is an ordinary file that may be staged.
+
+Patterns are matched directly against Unicode code points. Repeated wildcards use bounded greedy matching rather than a backtracking regular expression, with at most `pattern length × component length` comparisons per component and constant matching state. Rooted rules compare path components once without rebuilding every ancestor prefix. Supplementary Unicode characters work as literals and with `?`.
 
 ## Publication and failures
 

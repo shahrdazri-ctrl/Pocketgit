@@ -53,7 +53,7 @@ flowchart LR
 
 ## History and refs
 
-`HeadManager.Head` represents symbolic and detached HEAD separately. Readers recognize both, while normal commits and checkout use attached branches. `RefStore` validates branch names and nested ref paths, reads existing refs, and prepares complete replacements or exclusive new refs. `BranchService` coordinates branch creation with commits through `commit.lock`; it does not rewrite files or switch HEAD.
+`HeadManager.Head` represents symbolic and detached HEAD separately. Readers recognize both, while normal commits and checkout use attached branches. `RefStore` validates branch names and nested ref paths, rejects portable namespace collisions before creating directories, checks the stored case spelling on reads, and prepares complete replacements or exclusive new refs. Native Unicode normalization is handled without permitting separate alias directories. `BranchService` coordinates branch creation with commits through `commit.lock`; it does not rewrite files or switch HEAD.
 
 `LogService` iteratively traverses Commit parents with visited/active sets and a bound. Injectable readers allow cycles and very deep graphs to be tested independently. `CommitFormatter` formats log/show metadata. Missing parents, ambiguous prefixes, wrong types, and corrupt payloads fail explicitly.
 

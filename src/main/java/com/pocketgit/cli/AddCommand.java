@@ -1,19 +1,32 @@
 package com.pocketgit.cli;
 
 import com.pocketgit.services.AddService;
-import java.nio.file.Path;
-import java.util.concurrent.Callable;
+import com.pocketgit.util.TerminalText;
+
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
-import picocli.CommandLine.Model.CommandSpec;
 
-@Command(name = "add", mixinStandardHelpOptions = true, description = "Stage a file, directory, or the whole working tree with '.'.")
+import java.nio.file.Path;
+import java.util.concurrent.Callable;
+
+@Command(
+        name = "add",
+        mixinStandardHelpOptions = true,
+        description = "Stage a file, directory, or the whole working tree with '.'.")
 public final class AddCommand implements Callable<Integer> {
     private final Path workingDirectory;
     private final AddService service;
-    @Parameters(index = "0", paramLabel = "PATH", description = "File/directory relative to the current directory; '.' stages the entire repository.")
+
+    @Parameters(
+            index = "0",
+            paramLabel = "PATH",
+            description =
+                    "File/directory relative to the current directory; '.' stages the entire"
+                        + " repository.")
     private Path path;
+
     @Spec private CommandSpec spec;
 
     public AddCommand(Path workingDirectory, AddService service) {
@@ -21,12 +34,21 @@ public final class AddCommand implements Callable<Integer> {
         this.service = service;
     }
 
-    @Override public Integer call() throws Exception {
+    @Override
+    public Integer call() throws Exception {
         var result = service.add(workingDirectory, path);
         var output = spec.commandLine().getOut();
-        if (result.stagedPaths().size() == 1 && result.removedPaths().isEmpty()) output.println("Staged " + result.stagedPaths().getFirst());
-        else output.println("Staged " + result.stagedPaths().size() + " files and " + result.removedPaths().size() + " deletions.");
-        if (!result.ignoredPaths().isEmpty()) output.println("Skipped " + result.ignoredPaths().size() + " ignored paths.");
+        if (result.stagedPaths().size() == 1 && result.removedPaths().isEmpty())
+            output.println("Staged " + TerminalText.escapeLabel(result.stagedPaths().getFirst()));
+        else
+            output.println(
+                    "Staged "
+                            + result.stagedPaths().size()
+                            + " files and "
+                            + result.removedPaths().size()
+                            + " deletions.");
+        if (!result.ignoredPaths().isEmpty())
+            output.println("Skipped " + result.ignoredPaths().size() + " ignored paths.");
         return 0;
     }
 }

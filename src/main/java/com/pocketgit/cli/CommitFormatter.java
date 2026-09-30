@@ -18,9 +18,9 @@ public final class CommitFormatter {
                     .append('\n');
         }
         text.append("Author: ")
-                .append(commit.authorName())
+                .append(TerminalText.escapeLabel(commit.authorName()))
                 .append(" <")
-                .append(commit.authorEmail())
+                .append(TerminalText.escapeLabel(commit.authorEmail()))
                 .append(">\n");
         text.append("Date:   ").append(commit.timestamp()).append("\n\n");
         for (String line : commit.message().split("\\R", -1))

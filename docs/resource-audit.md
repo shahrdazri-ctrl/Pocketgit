@@ -77,5 +77,6 @@ before manually moving or deleting retained files.
 Validation performed in this cloud workspace is Linux evidence. The configured CI
 matrix runs CLI checks on Ubuntu, macOS, and Windows and the GUI scene on Linux;
 earlier native CI results in the previous audit apply to those earlier revisions.
-The GitHub Actions API returned HTTP 403 from this workspace, so remote CI results
-for this change were not observed.
+The GitHub Actions API returned HTTP 403 during that audit, so remote results were
+not observed at the time. A subsequent review confirmed that [run 36772066984](https://github.com/shahrdazri-ctrl/Pocketgit/actions/runs/36772066984)
+passed all three native CLI jobs and the Linux GUI build/scene for `6e98dc9`.

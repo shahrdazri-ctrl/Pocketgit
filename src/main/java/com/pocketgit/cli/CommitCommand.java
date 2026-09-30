@@ -43,7 +43,7 @@ public final class CommitCommand implements Callable<Integer> {
         else {
             out.println(
                     "["
-                            + result.branch()
+                            + TerminalText.escapeLabel(result.branch())
                             + " "
                             + result.commitHash().substring(0, 7)
                             + "] "
