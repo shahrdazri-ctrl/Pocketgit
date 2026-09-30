@@ -76,7 +76,8 @@ public final class IntegrityChecker {
                         if (attributes.isSymbolicLink())
                             throw new IOException("symbolic ref metadata");
                         if (attributes.isDirectory()) continue;
-                        String hash = refs.readBranch(branch);
+                        // The walk supplies the actual spelling; avoid a directory scan per ref.
+                        String hash = RefStore.decodeValue(branch, files.readText(path, 65));
                         if (hash != null) roots.add(hash);
                     } catch (IOException | IllegalArgumentException bad) {
                         errors.add("ref " + branch + ": " + bad.getMessage());

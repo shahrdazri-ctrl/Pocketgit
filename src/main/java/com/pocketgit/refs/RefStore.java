@@ -19,6 +19,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,22 +62,33 @@ public final class RefStore {
     public String readBranch(String branch) throws IOException {
         Path destination = path(branch);
         String value = files.readText(destination, 65);
-        // Windows resolves case aliases; require the actual spelling rather than silently
-        // attaching HEAD to a different name. macOS may normalize Unicode directory entries.
-        Path actual = destination.toRealPath(LinkOption.NOFOLLOW_LINKS);
-        int depth = repository.headsDirectory().relativize(destination).getNameCount();
-        String spelling =
-                actual.subpath(actual.getNameCount() - depth, actual.getNameCount())
-                        .toString()
-                        .replace(actual.getFileSystem().getSeparator(), "/");
-        if (!Normalizer.normalize(branch, Normalizer.Form.NFC)
-                .equals(Normalizer.normalize(spelling, Normalizer.Form.NFC)))
-            throw new IOException(
-                    "branch spelling differs from stored name: "
-                            + branch
-                            + " (stored: "
-                            + spelling
-                            + ")");
+        // toRealPath(NOFOLLOW_LINKS) need not return directory-entry spelling on Unix.
+        // Enumerate each parent once; compare case exactly and accept native normalization.
+        Path cursor = repository.headsDirectory();
+        for (Path component : repository.headsDirectory().relativize(destination)) {
+            files.requireDirectory(cursor);
+            Path matching = null;
+            String expected = Normalizer.normalize(component.toString(), Normalizer.Form.NFC);
+            try (var entries = Files.newDirectoryStream(cursor)) {
+                for (Path entry : entries) {
+                    if (Normalizer.normalize(entry.getFileName().toString(), Normalizer.Form.NFC)
+                            .equals(expected)) {
+                        matching = entry;
+                        break;
+                    }
+                }
+            } catch (java.nio.file.DirectoryIteratorException failure) {
+                throw failure.getCause();
+            }
+            if (matching == null)
+                throw new IOException("branch spelling differs from stored name: " + branch);
+            cursor = matching;
+        }
+        return decodeValue(branch, value);
+    }
+
+    /** Decode bounded ref text obtained from a validated metadata path. */
+    public static String decodeValue(String branch, String value) throws IOException {
         if (value.isEmpty()) return null;
         if (value.endsWith("\n")) value = value.substring(0, value.length() - 1);
         try {
@@ -109,7 +121,8 @@ public final class RefStore {
                 path(name);
                 names.add(name);
                 if (Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)) continue;
-                readBranch(name);
+                // Names obtained from the directory walk already have the stored spelling.
+                decodeValue(name, files.readText(entry, 65));
                 result.add(name);
             }
         } catch (java.io.UncheckedIOException failure) {
@@ -167,16 +180,18 @@ public final class RefStore {
         // actual parent spelling when both names resolve to that same directory; retain
         // case differences so the namespace check rejects them on every platform.
         var proposed = new ArrayList<String>();
+        var stored = new HashMap<String, String>();
+        for (String name : names) stored.put(Normalizer.normalize(name, Normalizer.Form.NFC), name);
         Path cursor = repository.headsDirectory();
+        var requested = new StringBuilder();
         for (Path component : repository.headsDirectory().relativize(destination)) {
             cursor = cursor.resolve(component);
+            if (!requested.isEmpty()) requested.append('/');
+            requested.append(component);
             String spelling = component.toString();
             if (Files.isDirectory(cursor, LinkOption.NOFOLLOW_LINKS)) {
-                String actual =
-                        cursor.toRealPath(LinkOption.NOFOLLOW_LINKS).getFileName().toString();
-                if (Normalizer.normalize(spelling, Normalizer.Form.NFC)
-                        .equals(Normalizer.normalize(actual, Normalizer.Form.NFC)))
-                    spelling = actual;
+                String actual = stored.get(Normalizer.normalize(requested, Normalizer.Form.NFC));
+                if (actual != null) spelling = actual.substring(actual.lastIndexOf('/') + 1);
             }
             proposed.add(spelling);
         }
