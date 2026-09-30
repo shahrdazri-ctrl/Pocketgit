@@ -10,7 +10,7 @@ The [recording](docs/screenshots/demo.cast) comes from the executable [demo scri
 
 ## Features
 
-- Byte-exact text and binary snapshots, nested deterministic Trees, and immutable compressed objects.
+- Byte-exact text and binary snapshots up to 64 MiB per file, streamed into immutable compressed objects and deterministic Trees.
 - Independent HEAD, staging index, and working-tree comparisons; scoped staging and root ignore rules.
 - Author configuration, parent-linked commits, branch creation/listing, history, and commit inspection.
 - Branch checkout with staged-work, local-edit, untracked-file, and path-obstruction protection.
@@ -139,12 +139,13 @@ Root `.pocketgitignore` supports literal patterns, `*`, `?`, leading `/`, and di
 - [Atomic publication and cooperative locks](docs/decisions/004-metadata-publication.md): fail explicitly when required filesystem operations are unsupported.
 - [Checkout before mutation](docs/decisions/005-safe-checkout.md): detect conflicts across files and directories; preserve unrelated work.
 - [Bounded LCS diff](docs/decisions/006-diff-strategy.md): deterministic, inspectable diffs with explicit resource limits.
+- [Streaming and private edit preparation](docs/decisions/007-streaming-and-edit-preparation.md): verify large Blobs with bounded buffers and retain recoverable originals on disk.
 
 ## Test and quality checks
 
 `mvn clean verify` compiles Java 21, runs JUnit unit tests, enforces at least 80% core line coverage, packages the executable CLI, and runs integration tests in separate Java processes. Coverage output is in `target/site/jacoco/`. Test fixtures use temporary directories; engine code never launches Git. CI runs the same workflow on Ubuntu, Windows, and macOS; the JavaFX scene check exercises 1,001 changed files with virtualized rows.
 
-Tests cover corruption, publication failure and rollback, lock contention, checkout conflicts, binary restore, portable-path aliases, terminal control sequences, shared history graphs, seeded snapshot round trips, and a 1,000-file mixed repository. The [deep audit report](docs/audit.md) records reproduced defects, fixes, and current validation evidence. [Phase 9 validation](docs/phase-9-validation.md) records coverage and benchmark observations; [phase reports](docs/phase-10-validation.md) distinguish local evidence from CI results.
+Tests cover corruption, publication failure and rollback, lock contention, checkout conflicts, binary restore, portable-path aliases, terminal control sequences, shared history graphs, seeded snapshot round trips, and a 1,000-file mixed repository. A packaged workflow exercises the full 64 MiB file limit with a 96 MiB JVM heap. The [resource and recovery audit](docs/resource-audit.md) records these regressions and release evidence; the [earlier audit](docs/audit.md) records the preceding safety and portability work. [Phase 9 validation](docs/phase-9-validation.md) records coverage and benchmark observations; [phase reports](docs/phase-10-validation.md) distinguish local evidence from CI results.
 
 Further behavior guides: [objects](docs/object-database.md), [commits](docs/commits.md), [status](docs/status.md), [history](docs/history-and-branches.md), [checkout](docs/checkout.md), [diff/restore](docs/diff-and-restore.md), and [integrity](docs/integrity.md). [pocketgit.md](pocketgit.md) remains the authoritative development specification.
 
@@ -152,8 +153,8 @@ Further behavior guides: [objects](docs/object-database.md), [commits](docs/comm
 
 Version 1.0 creates single-parent commits and switches existing branches. Merge, detached checkout, branch deletion, directory restore, staged restore, remote synchronization, Git compatibility, packfiles, and garbage collection are future work.
 
-Objects and individual working files are limited to 64 MiB; textual diff inputs are limited to 8 MiB and 100,000 lines each, with at most 4,000,000 changed-region LCS cells, and checkout preparation is capped at 256 MiB including backups. POSIX executable modes are preserved where supported; other platforms use regular-file modes. Symlinks are rejected. Snapshot names must be portable: Windows device names, trailing dots/spaces, and case/Unicode-normalization aliases are rejected on every platform.
+Objects and individual working files are limited to 64 MiB. Textual diff inputs are limited to 8 MiB and 100,000 lines each, with at most 4,000,000 changed-region LCS cells; a command also caps combined text inputs at 32 MiB and output at 250,000 hunk lines. Pretty object inspection is capped at 8 MiB and escapes terminal controls. Checkout preparation uses at most 256 MiB of private disk storage for content and backups. POSIX executable modes are preserved where supported; other platforms use regular-file modes. Symlinks are rejected. Snapshot names must be portable: Windows device names, trailing dots/spaces, and case/Unicode-normalization aliases are rejected on every platform.
 
-Metadata replacements are individually atomic, and ordinary checkout/restore failures attempt rollback. Multi-file operations are not crash-atomic; power loss or process termination can leave partial work, locks, and temporary files. Locks coordinate PocketGit writers, not external editors. [Recovery guidance](docs/integrity.md) explains inspecting and removing stale locks; `verify` diagnoses metadata and objects without repairing them.
+Metadata replacements are individually atomic, and ordinary checkout/restore failures attempt rollback. Multi-file operations are not crash-atomic; power loss or process termination can leave partial work, locks, and temporary files. Incomplete working-file rollback retains its private backups and a path manifest for manual recovery. Locks coordinate PocketGit writers, not external editors. [Recovery guidance](docs/integrity.md) explains inspecting and removing stale locks; `verify` diagnoses metadata and objects without repairing them.
 
 Future work starts with durable transaction recovery and three-way merge, followed by tags, reflog recovery, object collection, and optional remote transport. Native installers are optional distribution improvements; Java 21 and the self-contained CLI JAR remain the baseline.

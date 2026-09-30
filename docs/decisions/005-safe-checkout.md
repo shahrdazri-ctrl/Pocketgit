@@ -12,7 +12,7 @@ Build a complete `CheckoutPlan` from verified current/index/target snapshots and
 
 ## Consequences
 
-Known conflicts produce zero mutations and actionable paths. There is no force switch. Checkout can preserve unrelated unstaged changes, but intentionally blocks every staged change when switching branches. Backups consume bounded memory. Rollback improves ordinary-failure safety without promising recovery after process death or external concurrent edits.
+Known conflicts produce zero mutations and actionable paths. There is no force switch. Checkout can preserve unrelated unstaged changes, but intentionally blocks every staged change when switching branches. Backups consume bounded private disk storage; [ADR-007](007-streaming-and-edit-preparation.md) describes their lifecycle and recovery manifest. Rollback improves ordinary-failure safety without promising recovery after process death or external concurrent edits.
 
 ## Alternatives
 

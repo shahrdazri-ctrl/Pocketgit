@@ -12,7 +12,7 @@ Hash `type + " " + decimal byte length + NUL + payload` with SHA-256. Store one 
 
 ## Consequences
 
-Type and byte length are part of identity. Equal canonical content deduplicates naturally, while compressor differences do not affect IDs. Existing corrupt objects are errors rather than silently rewritten. Full IDs are longer than SHA-1. Hard-link support is required, and the current implementation holds bounded payloads in memory.
+Type and byte length are part of identity. Equal canonical content deduplicates naturally, while compressor differences do not affect IDs. Existing corrupt objects are errors rather than silently rewritten. Full IDs are longer than SHA-1. Hard-link support is required. Blob staging and verification use bounded streaming buffers; Tree/Commit semantic decoding and defensive-copy embedding APIs retain payloads. See [ADR-007](007-streaming-and-edit-preparation.md).
 
 ## Alternatives
 

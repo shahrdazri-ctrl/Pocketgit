@@ -46,7 +46,7 @@ Paths sort lexicographically within each section. The domain `RepositoryStatus` 
 
 Each indexed regular file is read every time using a streaming SHA-256 digest of `blob <length>`, NUL, and exact file bytes. Status does not rely on cached timestamps or file sizes to decide equality. Same-length edits with restored timestamps, binary bytes, and empty files are compared accurately. POSIX execute bits use the same mode policy as `add`; other filesystems fall back to regular mode.
 
-Streaming hashing avoids loading a working file into memory or writing a Blob. Even a tracked file enlarged beyond the 64 MiB staging/object limit can be reported as modified; staging it still obeys the existing limit. Untracked and ignored content is classified by path without reading its bytes or computing its hash.
+Streaming hashing avoids loading a working file into memory or writing a Blob. Indexed and committed Blobs are also verified using bounded buffers; status does not retain their payloads. Even a tracked file enlarged beyond the 64 MiB staging/object limit can be reported as modified; staging it still obeys the existing limit. Untracked and ignored content is classified by path without reading its bytes or computing its hash.
 
 Tracked files are checked explicitly before directory discovery, so new ignore rules never suppress an indexed modification or deletion. An ignored directory without indexed descendants is summarized as `path/` and its contents are not traversed. Where an ignored directory contains indexed descendants, status descends to report ignored siblings/subdirectories while retaining tracked paths. The root ignore grammar is shared with `add` and documented in [staging](staging.md).
 

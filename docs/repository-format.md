@@ -13,8 +13,17 @@ This document describes the on-disk formats and validation rules needed for an i
 | `objects/` | Immutable objects under two-character prefix directories. |
 | `refs/heads/` | Regular branch-ref files; nested branch names form subdirectories. |
 | `logs/HEAD` | Created by the first ref movement; commit and checkout reflog records. |
+| `edit-*` | Private transient checkout/restore preparation; retained if working-file recovery fails. |
 
 `init [DIRECTORY]` requires an existing directory and uses its physical path. It claims a new `.pocketgit` directory exclusively and never overwrites existing metadata. Reinitialization checks required directories and regular HEAD/index files without parsing every value or repairing the repository. Incomplete/unsafe metadata is retained and reported; initialization is not crash-transactional. Older repositories lacking `config` remain readable and can create it with `config user.name`/`user.email`.
+
+## Edit preparation and manual recovery
+
+Checkout and restore spool exact original/replacement bytes in a private `edit-*` directory under `.pocketgit`. On POSIX systems the directory starts with mode 0700 and data files with mode 0600. Content plus backups are bounded to 256 MiB. The directory is removed after successful publication or successful ordinary-failure rollback; incomplete working-file rollback reports and retains its location.
+
+`manifest.json` has `version: 1`, an `originals` array of `{path, backup, blobHash, permissions}`, and a `replacements` array of working paths. `backup` names the byte-exact original data file in the same directory; `blobHash` is its canonical Blob ID. POSIX permissions are enum names, or null where unavailable. Originals absent before the operation have no backup entry. Replacement files are preparation data, not previous contents.
+
+This manifest assists manual working-file recovery. It does not record a durable transaction state, previous index/HEAD/reflog, or complete directory metadata. Process death can leave preparation without a complete manifest. Follow the [recovery guidance](integrity.md) before moving or removing anything. Canonical object, index, and ref formats remain unchanged.
 
 ## HEAD and branch refs
 
@@ -44,7 +53,7 @@ For the 11 ASCII bytes `hello world`, canonical bytes are `blob 11`, NUL, then `
 fee53a18d32820613c0527aa79be5cb30173c823a9b448fa4817767cc84c6f03
 ```
 
-The default maximum payload is 67,108,864 bytes (64 MiB). The Java `ObjectStore` constructor can accept another bound; the CLI uses the default. Whole payloads are held in memory. A larger bound changes resource policy, not the format.
+The default maximum payload is 67,108,864 bytes (64 MiB). The Java `ObjectStore` constructor can accept another bound; the CLI uses the default. Blob staging, validation, extraction, status, and working-tree preparation use bounded streaming buffers. Tree/Commit semantic decoding and the embedding `read`/`readBlob` APIs retain their payloads in memory. A larger bound changes resource policy, not the format.
 
 ## Blob payload
 
