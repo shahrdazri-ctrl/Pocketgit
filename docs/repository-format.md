@@ -74,7 +74,7 @@ Tree payloads are compact UTF-8 JSON without whitespace outside strings or a fin
 
 Entries sort by Java `String.compareTo` (UTF-16 code-unit lexicographic order), independent of filesystem traversal and locale. Names are single valid path components; duplicates are forbidden. Blob entries have `REGULAR_FILE` or `EXECUTABLE_FILE`, Tree entries have `DIRECTORY`, and Commit entries are forbidden. The empty Tree payload is exactly `{"entries":[]}`.
 
-Strings use Jackson 2.18.11 default JSON escaping with Unicode emitted as UTF-8. Semantic readers reject unknown/missing/null fields, duplicate keys, trailing JSON, invalid values, and payloads unequal to canonical reserialization, including reordered properties, whitespace, alternate escaping, or unsorted entries.
+Strings use Jackson 2.22.3 default JSON escaping with Unicode emitted as UTF-8. Semantic readers reject unknown/missing/null fields, duplicate keys, trailing JSON, invalid values, and payloads unequal to canonical reserialization, including reordered properties, whitespace, alternate escaping, or unsorted entries.
 
 ## Commit payload
 

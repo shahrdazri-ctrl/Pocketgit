@@ -31,7 +31,7 @@ Each non-null `POCKETGIT_AUTHOR_NAME`/`POCKETGIT_AUTHOR_EMAIL` overrides its cor
 
 ## Canonical object payloads
 
-Both types use the existing SHA-256 object envelope and single zlib stream. Payload bytes are compact UTF-8 JSON without indentation or a trailing newline. Property order is explicit. Strings use Jackson 2.18.11's default JSON escaping with Unicode emitted as UTF-8. IDs hash the type/byte-length/NUL header plus these exact payload bytes.
+Both types use the existing SHA-256 object envelope and single zlib stream. Payload bytes are compact UTF-8 JSON without indentation or a trailing newline. Property order is explicit. Strings use Jackson 2.22.3's default JSON escaping with Unicode emitted as UTF-8. IDs hash the type/byte-length/NUL header plus these exact payload bytes.
 
 Tree property order is `entries`; entry order is `name`, `type`, `objectHash`, `mode`. Example shown formatted for readability:
 
