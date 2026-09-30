@@ -1,6 +1,5 @@
 package com.pocketgit.services;
 
-import com.pocketgit.model.FileMode;
 import com.pocketgit.model.Index;
 import com.pocketgit.model.IndexEntry;
 import com.pocketgit.model.ObjectType;
@@ -10,6 +9,7 @@ import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.IndexStore;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.PathUtils;
+import com.pocketgit.util.FileModeUtils;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -19,8 +19,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.PosixFileAttributeView;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
@@ -109,7 +107,7 @@ public final class AddService {
                     bytes = input.readNBytes(ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES + 1);
                 }
                 if (bytes.length > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES) throw new IOException("file exceeds 64 MiB object limit: " + file);
-                FileMode mode = fileMode(file);
+                var mode = FileModeUtils.fileMode(file);
                 BasicFileAttributes after = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
                 if (after.isSymbolicLink() || before.size() != after.size() || !before.lastModifiedTime().equals(after.lastModifiedTime())
                         || !java.util.Objects.equals(before.fileKey(), after.fileKey())) {
@@ -131,11 +129,4 @@ public final class AddService {
         return PathUtils.attributesOrMissing(path);
     }
 
-    private FileMode fileMode(Path file) throws IOException {
-        var view = Files.getFileAttributeView(file, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
-        if (view == null) return FileMode.REGULAR_FILE;
-        var permissions = view.readAttributes().permissions();
-        return permissions.contains(PosixFilePermission.OWNER_EXECUTE) || permissions.contains(PosixFilePermission.GROUP_EXECUTE)
-                || permissions.contains(PosixFilePermission.OTHERS_EXECUTE) ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-    }
 }

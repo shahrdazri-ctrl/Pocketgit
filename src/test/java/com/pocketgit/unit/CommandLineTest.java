@@ -50,7 +50,7 @@ class CommandLineTest {
     }
 
     @Test void futureCommandsReportNotImplementedAndDoNotWriteAnything() {
-        for (String name : new String[]{"status", "log", "diff", "branch", "checkout", "restore"}) {
+        for (String name : new String[]{"log", "diff", "branch", "checkout", "restore"}) {
             Result result = execute(name);
             assertEquals(3, result.code(), name);
             assertEquals("Not implemented yet.", result.err().strip());

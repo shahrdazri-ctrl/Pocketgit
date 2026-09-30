@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1–4 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, and commits with parent links and a reflog. Status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
+Phases 1–5 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, and accurate staged/unstaged/untracked status. History, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -84,6 +84,17 @@ Commits capture the index, including staged content and executable modes, even w
 
 `config user.name` and `config user.email` read local settings. `POCKETGIT_AUTHOR_NAME` and `POCKETGIT_AUTHOR_EMAIL` override their respective settings; an absent identity produces an actionable error. See [commits](docs/commits.md) for the formats and publication/recovery behavior.
 
+## Inspect repository status
+
+```bash
+pocketgit status
+pocketgit status --ignored
+```
+
+Status compares HEAD with the index for staged additions/modifications/deletions, and the index with working files for unstaged modifications/deletions. A file can appear in both comparisons when edited again after staging. It also lists untracked files, and `--ignored` shows ignored untracked paths. Tracked files remain visible under new ignore rules. Executable mode changes count as modifications where POSIX permissions are available.
+
+Before the first commit, status reports `No commits yet`. A clean repository reports `nothing to commit, working tree clean`. Status is read-only, hashes tracked file content on every run, and works from nested directories. [Status documentation](docs/status.md) explains classification, ignored directory summaries, error behavior, and concurrent changes.
+
 ## Implementation notes
 
 - [Architecture](docs/architecture.md)
@@ -95,5 +106,7 @@ Commits capture the index, including staged content and executable modes, even w
 - [Phase 3 validation](docs/phase-3-validation.md)
 - [Trees, commits, configuration, and ref publication](docs/commits.md)
 - [Phase 4 validation](docs/phase-4-validation.md)
+- [Status classification and working-tree comparison](docs/status.md)
+- [Phase 5 validation](docs/phase-5-validation.md)
 
-The next phase is the status engine and working-tree comparison. Subsequent work follows the master prompt in order.
+The next phase is commit history, references, and branching. Subsequent work follows the master prompt in order.
