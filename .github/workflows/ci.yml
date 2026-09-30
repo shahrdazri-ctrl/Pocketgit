@@ -30,7 +30,7 @@ jobs:
       - name: Report Maven and test failures
         if: failure()
         run: python scripts/report-ci-failures.py
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: pocketgit-${{ matrix.os }}
@@ -94,7 +94,7 @@ jobs:
           timeout 60 java -Djavafx.cachedir="$GITHUB_WORKSPACE/target/gui-smoke/native" -Dglass.platform=Monocle -Dmonocle.platform=Headless -Dprism.order=sw -Dpocketgit.gui.smoke=true -Dpocketgit.gui.smoke.expectedFiles=1001 -Dpocketgit.gui.screenshot="$screenshot" -cp "$artifact:$monocle" com.pocketgit.PocketGit gui
           find .pocketgit -type f -exec sha256sum {} + | LC_ALL=C sort > "$GITHUB_WORKSPACE/target/gui-smoke/after.sha256"
           cmp "$GITHUB_WORKSPACE/target/gui-smoke/before.sha256" "$GITHUB_WORKSPACE/target/gui-smoke/after.sha256"
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: pocketgit-gui-linux

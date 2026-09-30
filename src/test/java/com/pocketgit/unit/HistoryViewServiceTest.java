@@ -62,7 +62,7 @@ class HistoryViewServiceTest {
         Path nested = Files.createDirectories(root.resolve("folder with spaces/日本語"));
         var before = state();
         var history = viewer.load(nested);
-        assertEquals(root.toAbsolutePath(), history.repositoryRoot());
+        assertEquals(root.toRealPath(), history.repositoryRoot());
         assertEquals("main", history.currentBranch());
         assertNull(history.headHash());
         assertEquals(List.of(new HistoryViewService.Branch("main", null, true)), history.branches());

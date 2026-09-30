@@ -91,6 +91,7 @@ public final class PathUtils {
     /** Checks original components before normalization, including links canceled by '..'. */
     public static Path safeWorkingPath(Path root, Path requested) throws IOException {
         Path absolute = requested.toAbsolutePath();
+        if (!absolute.startsWith(root)) absolute = resolveRootAlias(root, absolute);
         if (!absolute.startsWith(root) || !absolute.normalize().startsWith(root)) {
             throw new IOException("path is outside repository: " + requested);
         }
@@ -128,6 +129,24 @@ public final class PathUtils {
             }
         }
         return cursor;
+    }
+
+    /** Resolve aliases above the repository, retaining every untrusted working-tree component. */
+    private static Path resolveRootAlias(Path root, Path absolute) throws IOException {
+        Path prefix = absolute.getRoot();
+        for (int i = 0; i < absolute.getNameCount(); i++) {
+            prefix = prefix.resolve(absolute.getName(i));
+            try {
+                if (prefix.toRealPath().equals(root)) {
+                    return i + 1 == absolute.getNameCount()
+                            ? root
+                            : root.resolve(absolute.subpath(i + 1, absolute.getNameCount()));
+                }
+            } catch (NoSuchFileException | java.nio.file.NotDirectoryException absent) {
+                break;
+            }
+        }
+        return absolute;
     }
 
     /** A former directory replaced by a regular file makes its staged descendants absent. */
