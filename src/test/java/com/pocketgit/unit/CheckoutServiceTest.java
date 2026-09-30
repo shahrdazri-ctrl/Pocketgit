@@ -134,4 +134,30 @@ class CheckoutServiceTest {
         assertThrows(IOException.class,()->checkout.checkout(root,"feature")); try(var files=Files.list(outside)) { assertEquals(0,files.count()); }
         assertEquals("main",new HeadManager(repo).readBranch());
     }
+
+    @Test void metadataRecoveryContinuesAfterIndexRecoveryIsBlocked() throws Exception {
+        Path outside = Files.createTempFile(root.getParent(), "checkout-recovery-outside", ".txt");
+        Files.writeString(outside, "outside must stay untouched");
+        try { Files.createSymbolicLink(root.resolve("probe"), outside); Files.delete(root.resolve("probe")); }
+        catch (IOException | UnsupportedOperationException unsupported) { assumeTrue(false, "symlinks unavailable"); }
+        file("a", "feature bytes"); commit("feature"); branch();
+        file("a", "main bytes"); commit("main");
+        byte[] oldHead = Files.readAllBytes(repo.headFile());
+        byte[] oldLog = Files.readAllBytes(repo.logsDirectory().resolve("HEAD"));
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var failing = new CheckoutService(Clock.systemUTC(), () -> {
+            if (calls.incrementAndGet() == 3) {
+                Files.delete(repo.indexFile());
+                Files.createSymbolicLink(repo.indexFile(), outside);
+                throw new IOException("index obstructed after HEAD publication");
+            }
+        });
+        var failure = assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
+        assertTrue(failure.getMessage().contains("rollback incomplete"));
+        assertArrayEquals(oldHead, Files.readAllBytes(repo.headFile()));
+        assertArrayEquals(oldLog, Files.readAllBytes(repo.logsDirectory().resolve("HEAD")));
+        assertEquals("main bytes", Files.readString(root.resolve("a")));
+        assertEquals("outside must stay untouched", Files.readString(outside));
+        assertTrue(Files.isSymbolicLink(repo.indexFile()));
+    }
 }

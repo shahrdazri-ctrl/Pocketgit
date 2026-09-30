@@ -22,7 +22,7 @@ Symbolic HEAD is exactly `ref: refs/heads/NAME` with an optional final LF. Detac
 
 A branch file contains either zero bytes (unborn) or one full lowercase hexadecimal Commit ID with optional final LF. Whitespace, extra lines, malformed IDs, symlinks, and nonregular files are errors. An empty missing branch is not equivalent to an unborn branch: a referenced branch must exist. New branch creation requires an existing commit and preserves HEAD/index/working files.
 
-Branch names support nested `feature/login` paths. Validation rejects null/blank names, `HEAD`, leading `-` or `/`, trailing `/`, `..`, `@{`, controls/whitespace, and `~ ^ : ? * [ \\`. Every `/` component must be nonempty, must not begin/end with `.`, and must not end with `.lock`. This prevents traversal and ambiguous metadata names.
+Branch names support nested `feature/login` paths. Validation rejects null/blank names, `HEAD`, leading `-` or `/`, trailing `/`, `..`, `@{`, controls/whitespace, and `~ ^ : ? * [ \\`. Every `/` component must be nonempty, must not begin/end with `.`, and must not end with `.lock`. Components also follow the portable-name rules below, including Windows device-name rejection. This prevents traversal and ambiguous metadata names.
 
 ## Object envelope, ID, and file path
 
@@ -107,7 +107,9 @@ The index is pretty-printed UTF-8 JSON with explicit LF and a final LF. Its stri
 
 Entries sort by Java lexicographic String order. Duplicate paths and file/directory ancestor conflicts are forbidden. IDs must refer to Blobs; file modes are `REGULAR_FILE` or `EXECUTABLE_FILE`. POSIX execute bits determine staging mode; platforms without POSIX permissions record regular files.
 
-Paths are repository-relative with `/` separators. Empty/absolute paths, dot or empty components, backslashes, colons, ASCII control characters/DEL, and case-insensitive `.pocketgit` components are invalid. Spaces and Unicode are supported. These rules do not make every name legal on every filesystem; callers must also satisfy their platform's filename and case constraints.
+Paths are repository-relative with `/` separators. Empty/absolute paths, dot or empty components, backslashes, colons, ASCII control characters/DEL, and case-insensitive `.pocketgit` components are invalid. Internal spaces and Unicode are supported. Components must not end in a dot or space, contain `<>"|?*`, or use Windows device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, including extensions and Windows-recognized superscript digits). This blocks aliases such as `.pocketgit./HEAD` on Windows.
+
+Snapshots and Tree siblings reject distinct spellings with the same NFC-normalized, case-insensitive path key, including directory prefixes. For example, `README` plus `readme`, `src/A` plus `SRC/B`, and composed plus decomposed spellings of `café` are collisions. Each Unicode code point in the normalized key maps through `Character.toLowerCase(Character.toUpperCase(codePoint))`, independent of the process locale; this also catches Greek sigma/final-sigma aliases that ordinary lowercasing misses. Names are validated, never rewritten; valid object encodings and IDs are unchanged. This deliberately conservative portability policy also applies on case-sensitive filesystems. Older snapshots with these formerly accepted nonportable names are rejected rather than silently materialized. Platform path-length limits and additional filesystem-specific restrictions still apply.
 
 The reader rejects unknown versions/fields, missing/null values, duplicate JSON keys, trailing values, scalar coercions, invalid paths/IDs/modes, and indexes above 16 MiB. The index describes the next commit, independently of both HEAD and working files.
 
