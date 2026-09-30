@@ -47,3 +47,7 @@ java -Dpocketgit.gui.smoke=true \
 Run this from a committed temporary repository with a desktop/virtual display. The optional screenshot is captured from the actual JavaFX scene. A successful normal CLI build establishes engine behavior, not display availability; [phase validation](phase-10-validation.md) records separately which GUI checks actually ran.
 
 CI also exercises the scene offscreen with checksum-pinned TestFX Monocle 21.0.2 and software rendering. Monocle is validation tooling; it is not included in either release JAR. In this restricted cloud workspace, `-Djavafx.cachedir=/workspace/.cache/javafx` and `XDG_CACHE_HOME=/workspace/.cache` provide writable native-library and font caches without changing the user home directory.
+
+## Large histories and snapshots
+
+History validation walks the union of branch histories once, rather than revisiting common ancestors for each branch tip. Changed files use a virtualized list: a 1,001-file root commit binds all its file records while creating only visible UI rows. New selections cancel obsolete detail tasks and remove queued tasks before starting the next read. The worker remains read-only. CI checks the changed-file count, bounded cell creation, scene metadata, and identical before/after repository manifests.

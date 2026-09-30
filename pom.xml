@@ -9,6 +9,7 @@
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <project.build.outputTimestamp>2026-09-30T00:00:00Z</project.build.outputTimestamp>
   </properties>
   <dependencies>
     <dependency><groupId>info.picocli</groupId><artifactId>picocli</artifactId><version>4.7.6</version></dependency>
@@ -18,6 +19,14 @@
   <build>
     <finalName>pocketgit</finalName>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>3.5.0</version>
+        <executions><execution><id>supported-toolchain</id><goals><goal>enforce</goal></goals>
+          <configuration><rules><requireJavaVersion><version>[21,)</version></requireJavaVersion><requireMavenVersion><version>[3.9,)</version></requireMavenVersion></rules></configuration>
+        </execution></executions>
+      </plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.2</version><configuration><forceCreation>true</forceCreation></configuration></plugin>
       <plugin>
         <groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>0.8.13</version>
         <configuration><excludes><exclude>com/pocketgit/cli/**</exclude><exclude>com/pocketgit/PocketGit*</exclude><exclude>com/pocketgit/gui/**</exclude></excludes></configuration>

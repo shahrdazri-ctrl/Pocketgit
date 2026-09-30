@@ -1,5 +1,7 @@
 # PocketGit
 
+[![Build and test](https://github.com/shahrdazri-ctrl/Pocketgit/actions/workflows/ci.yml/badge.svg)](https://github.com/shahrdazri-ctrl/Pocketgit/actions/workflows/ci.yml)
+
 PocketGit is a Git-inspired version-control engine written from scratch in Java 21. It implements immutable content-addressable storage, SHA-256 object IDs, staging, commit trees, branches, safe checkout, history traversal, unified diffs, restoration, and integrity verification without invoking Git or using JGit.
 
 ![A real PocketGit terminal workflow](docs/screenshots/demo.gif)
@@ -138,9 +140,9 @@ Root `.pocketgitignore` supports literal patterns, `*`, `?`, leading `/`, and di
 
 ## Test and quality checks
 
-`mvn clean verify` compiles Java 21, runs JUnit unit tests, enforces at least 80% core line coverage, packages the executable CLI, and runs integration tests in separate Java processes. Coverage output is in `target/site/jacoco/`. Test fixtures use temporary directories; engine code never launches Git. CI runs the same workflow on Ubuntu, Windows, and macOS.
+`mvn clean verify` compiles Java 21, runs JUnit unit tests, enforces at least 80% core line coverage, packages the executable CLI, and runs integration tests in separate Java processes. Coverage output is in `target/site/jacoco/`. Test fixtures use temporary directories; engine code never launches Git. CI runs the same workflow on Ubuntu, Windows, and macOS; the JavaFX scene check exercises 1,001 changed files with virtualized rows.
 
-Tests cover corruption, publication failure and rollback, lock contention, checkout conflicts, binary restore, seeded snapshot round trips, and a 1,000-file mixed repository. [Phase 9 validation](docs/phase-9-validation.md) records coverage and benchmark observations; [phase reports](docs/phase-10-validation.md) distinguish local evidence from CI results.
+Tests cover corruption, publication failure and rollback, lock contention, checkout conflicts, binary restore, portable-path aliases, terminal control sequences, shared history graphs, seeded snapshot round trips, and a 1,000-file mixed repository. The [deep audit report](docs/audit.md) records reproduced defects, fixes, and current validation evidence. [Phase 9 validation](docs/phase-9-validation.md) records coverage and benchmark observations; [phase reports](docs/phase-10-validation.md) distinguish local evidence from CI results.
 
 Further behavior guides: [objects](docs/object-database.md), [commits](docs/commits.md), [status](docs/status.md), [history](docs/history-and-branches.md), [checkout](docs/checkout.md), [diff/restore](docs/diff-and-restore.md), and [integrity](docs/integrity.md). [pocketgit.md](pocketgit.md) remains the authoritative development specification.
 
@@ -148,7 +150,7 @@ Further behavior guides: [objects](docs/object-database.md), [commits](docs/comm
 
 Version 1.0 creates single-parent commits and switches existing branches. Merge, detached checkout, branch deletion, directory restore, staged restore, remote synchronization, Git compatibility, packfiles, and garbage collection are future work.
 
-Objects and individual working files are limited to 64 MiB; diff uses at most 4,000,000 changed-region LCS cells, and checkout preparation is capped at 256 MiB including backups. POSIX executable modes are preserved where supported; other platforms use regular-file modes. Symlinks are rejected. Case-sensitive or platform-specific filenames must be compatible with the destination filesystem.
+Objects and individual working files are limited to 64 MiB; textual diff inputs are limited to 8 MiB and 100,000 lines each, with at most 4,000,000 changed-region LCS cells, and checkout preparation is capped at 256 MiB including backups. POSIX executable modes are preserved where supported; other platforms use regular-file modes. Symlinks are rejected. Snapshot names must be portable: Windows device names, trailing dots/spaces, and case/Unicode-normalization aliases are rejected on every platform.
 
 Metadata replacements are individually atomic, and ordinary checkout/restore failures attempt rollback. Multi-file operations are not crash-atomic; power loss or process termination can leave partial work, locks, and temporary files. Locks coordinate PocketGit writers, not external editors. [Recovery guidance](docs/integrity.md) explains inspecting and removing stale locks; `verify` diagnoses metadata and objects without repairing them.
 

@@ -74,3 +74,7 @@ The recorder uses a PTY, real elapsed timestamps, and short pauses between comma
 ## Publishing
 
 Distribute the validated versioned JAR and its checksum together with links to the README, format specification, and applicable validation report. The project does not require remote hosting or Git compatibility to run. Tagging or uploading a release is a separate publication action; a committed packaging configuration is not evidence that an external release has been published.
+
+## Reproducible packaging
+
+The build pins the resource and JAR plugins, forces creation of a fresh unshaded input JAR before each shade operation, and sets `project.build.outputTimestamp` for stable ZIP entry timestamps. Java 21+ and Maven 3.9+ are checked at the start by Maven Enforcer. With the same JDK, platform, source tree, dependencies, and build properties, repeating `mvn package -DskipTests` should produce the same CLI JAR digest. `-DskipTests` is only for this second packaging comparison after a complete `mvn clean verify`; it does not replace the release gates. Override `-Dproject.build.outputTimestamp=...` deliberately when preparing a different release.
