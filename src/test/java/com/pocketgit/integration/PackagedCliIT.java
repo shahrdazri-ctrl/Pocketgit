@@ -36,7 +36,7 @@ class PackagedCliIT {
         assertTrue(help.output().contains("Usage: pocketgit"));
         assertTrue(help.output().contains("restore"));
         assertEquals("PocketGit 0.1.0", run(temp, "--version").output().strip());
-        Result placeholder = run(temp, "checkout");
+        Result placeholder = run(temp, "restore");
         assertEquals(3, placeholder.code());
         assertEquals("Not implemented yet.", placeholder.output().strip());
         assertFalse(Files.exists(temp.resolve(".pocketgit")));

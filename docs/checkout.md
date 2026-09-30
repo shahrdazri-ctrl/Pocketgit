@@ -1,0 +1,11 @@
+# Safe checkout (Phase 7)
+
+`pocketgit checkout BRANCH` switches to an existing branch, restores its verified snapshot, and updates the index, symbolic HEAD, and HEAD reflog. Checkout of the attached branch reports `Already on 'BRANCH'` without rewriting files. Branch names and metadata paths retain Phase 6 validation. Detached checkout is not exposed.
+
+`CheckoutPlanner` computes all writes, removals, and conflicts before mutation. Staged changes block switching: commit them first. Unstaged changes to affected tracked files, missing affected tracked files, conflicting untracked/ignored files, symlinks, and obstructions in ancestor or descendant paths block switching. Unrelated unstaged files and untracked files survive. Tracked file/directory transitions are supported only when they do not consume unrelated files or empty directories. There is no force option.
+
+Checkout holds `index.lock` then `commit.lock`, sharing the same order as commits. Target Commits, Trees, and Blobs are fully verified before editing. Plans are checked again immediately before application. Changed contents and original permissions are prepared with a 256 MiB combined content/backup bound; individual working files have the object store's 64 MiB bound. Complete replacement files are forced and atomically moved into place. POSIX executable distinction is restored; platforms without POSIX permissions use regular files.
+
+Ordinary failures trigger rollback of files, directories, index, HEAD, and reflog; tests inject failures after file changes and after each metadata publication. A rollback error is explicitly reported and requires repository inspection. This is not a crash-atomic multi-file transaction: process termination or power loss can leave a partial operation and stale locks. Do not edit files concurrently with checkout, restore, or manual metadata changes; locks coordinate PocketGit writers, not external editors. The existing metadata safety assumption against malicious concurrent directory replacement still applies.
+
+A checkout reflog entry retains the old/new 64-character IDs and UTC timestamp, with operation `checkout`. Zero IDs represent an unborn endpoint. Commit reflog entries are unchanged. Index and object formats are unchanged.

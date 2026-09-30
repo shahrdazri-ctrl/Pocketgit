@@ -16,4 +16,4 @@ HEAD accepts either `ref: refs/heads/NAME` or a full lowercase Commit ID, with a
 
 Branch creation also holds `commit.lock`, sharing serialization with commits and ref updates. Complete ref bytes (`64-character ID + LF`) are forced to a private temporary file. New branches publish through an exclusive hard link; existing updates use atomic replacement. A concurrent destination is never overwritten by creation. Ref directories may remain empty if an operation fails after creating them. No multi-file transaction or directory fsync durability is promised; abrupt termination can leave lock or temporary files. Inspect active operations and repository state before manual cleanup. Metadata safety assumes another process does not maliciously rename directories during access, as in the existing object store.
 
-Checkout, diff, and restore remain explicit placeholders for later phases.
+Branch switching is documented in [checkout](checkout.md). Diff and restore belong to Phase 8.

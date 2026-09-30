@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1–6 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, accurate staged/unstaged/untracked status, history traversal, branch creation/listing, and commit inspection by unique hash prefix. Checkout, diff, and restore remain explicit placeholders that exit with code 3.
+Phases 1–7 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, commits with parent links and a reflog, accurate staged/unstaged/untracked status, history traversal, branch creation/listing, and commit inspection by unique hash prefix. Diff and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -107,6 +107,14 @@ pocketgit branch feature/login
 
 History starts at HEAD, validates parent Commits, and prints newest first for single-parent history. `show` accepts full IDs or unique lowercase hexadecimal prefixes and displays the Tree, parents, author, timestamp, and message. Missing or ambiguous prefixes fail clearly. Branches are sorted, with `*` marking the current branch; creating a branch captures the current commit without switching branches or modifying working files. Creation before the first commit and duplicate names are rejected. See [history and branches](docs/history-and-branches.md) for detached HEAD, safety, and traversal limits.
 
+## Switch branches safely
+
+```bash
+pocketgit checkout feature/login
+```
+
+Checkout refuses to discard staged work or overwrite conflicting local and untracked files. Unrelated work is preserved. See [checkout safety](docs/checkout.md) for policies and crash limitations.
+
 ## Implementation notes
 
 - [Architecture](docs/architecture.md)
@@ -123,4 +131,4 @@ History starts at HEAD, validates parent Commits, and prints newest first for si
 - [History, references, and branches](docs/history-and-branches.md)
 - [Phase 6 validation](docs/phase-6-validation.md)
 
-The next phase is safe checkout and branch switching. Subsequent work follows the master prompt in order.
+Safe branch checkout is implemented with staged/unstaged/untracked conflict protection and ordinary-failure rollback. The next phase is diff and restore. Subsequent work follows the master prompt in order.

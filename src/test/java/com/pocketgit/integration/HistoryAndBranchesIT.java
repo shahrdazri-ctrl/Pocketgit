@@ -80,7 +80,7 @@ class HistoryAndBranchesIT {
         assertEquals("ref: refs/heads/main\n",Files.readString(root.resolve(".pocketgit/HEAD")));
         assertEquals("unstaged work\n",Files.readString(root.resolve("hello.txt")));
         assertEquals("private untracked work\n",Files.readString(root.resolve("untracked.txt")));
-        assertEquals(3,run(root,"checkout","alpha").code());
+        assertEquals(1,run(root,"checkout","feature/login").code());
     }
     @Test void invalidCommandsAndCorruptHistoryFailWithoutPartialOutputOrMutations() throws Exception {
         Path root=initialize(); String first=commit(root,"First","first"); String second=commit(root,"Second","second");
