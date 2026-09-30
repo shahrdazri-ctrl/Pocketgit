@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import re
+import sys
 import xml.etree.ElementTree as ET
 
 
@@ -16,6 +17,8 @@ def annotation(level, title, message):
 
 
 def main():
+    # Windows redirected stdout can use a legacy code page. Check annotations are UTF-8.
+    sys.stdout.reconfigure(encoding='utf-8', errors='backslashreplace')
     failures = 0
     for directory in ('target/surefire-reports', 'target/failsafe-reports'):
         for path in sorted(Path(directory).glob('TEST-*.xml')):
@@ -35,7 +38,7 @@ def main():
         return
     log = Path(os.environ.get('RUNNER_TEMP', '/tmp')) / 'pocketgit-build.log'
     if log.exists():
-        errors = [line for line in log.read_text(errors='replace').splitlines() if '[ERROR]' in line]
+        errors = [line for line in log.read_text(encoding='utf-8', errors='replace').splitlines() if '[ERROR]' in line]
         if errors:
             annotation('error', 'Maven build failure', '\n'.join(errors[:12]))
             return
