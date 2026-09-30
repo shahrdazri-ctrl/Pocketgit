@@ -17,3 +17,7 @@ HEAD accepts either `ref: refs/heads/NAME` or a full lowercase Commit ID, with a
 Branch creation also holds `commit.lock`, sharing serialization with commits and ref updates. Complete ref bytes (`64-character ID + LF`) are forced to a private temporary file. New branches publish through an exclusive hard link; existing updates use atomic replacement. A concurrent destination is never overwritten by creation. Ref directories may remain empty if an operation fails after creating them. No multi-file transaction or directory fsync durability is promised; abrupt termination can leave lock or temporary files. Inspect active operations and repository state before manual cleanup. Metadata safety assumes another process does not maliciously rename directories during access, as in the existing object store.
 
 Branch switching is documented in [checkout](checkout.md). Diff and restore belong to Phase 8.
+
+Shared-history readers used by verification and the viewer validate all roots in one bounded iterative traversal. Each distinct Commit is read once across the entire forest. A stack frame advances one parent at a time, avoiding an unbounded queue of pending siblings while retaining stored parent order and active-path cycle detection. Snapshot scans verify repeated Blob IDs once per scan; verification is never cached across separate calls.
+
+Commit and diff display escapes terminal control characters without modifying stored metadata or file bytes. Raw `cat-object` remains deliberately byte-exact.

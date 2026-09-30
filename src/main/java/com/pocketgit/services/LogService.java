@@ -8,6 +8,7 @@ import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.HashUtils;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -19,14 +20,32 @@ import java.util.Objects;
 /** Iterative, bounded parent traversal. Complete results are validated before CLI output. */
 public final class LogService {
     public record Entry(String hash, Commit commit) {}
-    @FunctionalInterface public interface CommitReader { Commit read(String hash) throws IOException; }
-    private record Visit(String hash, boolean leaving) {}
+
+    @FunctionalInterface
+    public interface CommitReader {
+        Commit read(String hash) throws IOException;
+    }
+
+    private static final class Frame {
+        final String hash;
+        final Commit commit;
+        int nextParent;
+
+        Frame(String hash, Commit commit) {
+            this.hash = hash;
+            this.commit = commit;
+        }
+    }
+
     public static final int MAX_COMMITS = 100_000;
 
     private Repository locate(Path cwd) throws IOException {
-        return new Repository(new RepositoryLocator().findRepositoryRoot(cwd)
-                .orElseThrow(() -> new IOException("not a PocketGit repository")));
+        return new Repository(
+                new RepositoryLocator()
+                        .findRepositoryRoot(cwd)
+                        .orElseThrow(() -> new IOException("not a PocketGit repository")));
     }
+
     public List<Entry> log(Path cwd) throws IOException {
         var repository = locate(cwd);
         var heads = new HeadManager(repository);
@@ -41,34 +60,64 @@ public final class LogService {
         }
         return entries;
     }
+
     public Entry show(Path cwd, String prefix) throws IOException {
         var objects = new ObjectStore(locate(cwd));
         String hash = objects.resolve(prefix);
         return new Entry(hash, new ObjectCodec().decodeCommit(objects.read(hash)));
     }
+
     /** Parents are visited in stored order, depth first; shared ancestors are emitted only once. */
     public List<Entry> traverse(String start, CommitReader reader) throws IOException {
         if (start == null) return List.of();
-        HashUtils.validateSha256(start);
-        var pending = new ArrayDeque<Visit>();
+        return traverseRoots(List.of(start), reader);
+    }
+
+    /**
+     * Validate a union of histories once, rather than walking every shared ancestor for every ref.
+     */
+    public List<Entry> traverseRoots(List<String> roots, CommitReader reader) throws IOException {
+        var pending = new ArrayDeque<Frame>();
         var visited = new HashSet<String>();
         var active = new HashSet<String>();
         var result = new ArrayList<Entry>();
-        pending.push(new Visit(start, false));
-        while (!pending.isEmpty()) {
-            var visit = pending.pop();
-            if (visit.leaving()) { active.remove(visit.hash()); continue; }
-            if (active.contains(visit.hash())) throw new IOException("cycle in commit history at " + visit.hash());
-            if (!visited.add(visit.hash())) continue;
-            if (visited.size() > MAX_COMMITS) throw new IOException("commit history traversal limit exceeded");
-            Commit commit;
-            try { commit = reader.read(visit.hash()); }
-            catch (IOException invalid) { throw new IOException("cannot read history commit " + visit.hash() + ": " + invalid.getMessage(), invalid); }
-            result.add(new Entry(visit.hash(), commit));
-            active.add(visit.hash());
-            pending.push(new Visit(visit.hash(), true));
-            var parents = commit.parentHashes();
-            for (int i = parents.size() - 1; i >= 0; i--) pending.push(new Visit(parents.get(i), false));
+        for (String root : roots) {
+            HashUtils.validateSha256(root);
+            if (visited.contains(root)) continue;
+            String next = root;
+            while (next != null || !pending.isEmpty()) {
+                if (next != null) {
+                    if (active.contains(next))
+                        throw new IOException("cycle in commit history at " + next);
+                    if (visited.add(next)) {
+                        if (visited.size() > MAX_COMMITS)
+                            throw new IOException("commit history traversal limit exceeded");
+                        Commit commit;
+                        try {
+                            commit = reader.read(next);
+                        } catch (IOException invalid) {
+                            throw new IOException(
+                                    "cannot read history commit "
+                                            + next
+                                            + ": "
+                                            + invalid.getMessage(),
+                                    invalid);
+                        }
+                        result.add(new Entry(next, commit));
+                        active.add(next);
+                        pending.push(new Frame(next, commit));
+                    }
+                    next = null;
+                }
+                var frame = pending.peek();
+                if (frame == null) break;
+                if (frame.nextParent == frame.commit.parentHashes().size()) {
+                    pending.pop();
+                    active.remove(frame.hash);
+                } else {
+                    next = frame.commit.parentHashes().get(frame.nextParent++);
+                }
+            }
         }
         return List.copyOf(result);
     }

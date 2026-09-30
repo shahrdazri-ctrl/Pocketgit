@@ -8,7 +8,7 @@ Users need readable staged and unstaged diffs, binary safety, and explicit resou
 
 ## Decision
 
-Implement line-based LCS in Java. Retain final-newline state, trim shared prefixes/suffixes, prefer removals before additions on ties, and render unified hunks with three context lines. Reject changed-region matrices exceeding 4,000,000 cells. NUL or invalid UTF-8 content produces a binary-difference summary rather than raw bytes.
+Implement line-based LCS in Java. Retain final-newline state, trim shared prefixes/suffixes, prefer removals before additions on ties, and render unified hunks with three context lines. Bound text inputs to 8 MiB and 100,000 lines per side before allocation, and reject changed-region matrices exceeding 4,000,000 cells. Store the matrix in one flat array so asymmetric inputs do not allocate millions of row objects. NUL or invalid UTF-8 content produces a binary-difference summary rather than raw bytes.
 
 ## Consequences
 
