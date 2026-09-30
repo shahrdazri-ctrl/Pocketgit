@@ -1,4 +1,4 @@
-# Phase 1 architecture
+# PocketGit architecture
 
 `PocketGit` assembles the Picocli command tree and handles errors at the CLI boundary. `RootCommand` displays help. `InitCommand` resolves the optional directory argument, invokes `RepositoryInitializer`, and formats its result. Placeholder commands do not perform I/O and return exit code 3.
 
@@ -23,3 +23,11 @@ Maven separates unit tests (`*Test`, Surefire) from packaged integration tests (
 `Index` and `IndexEntry` are immutable, sorted, validated snapshots. `IndexStore` reads strict version-1 JSON, owns the update lock, and publishes snapshots by atomic replacement. `AddService` owns discovery, scope planning, tracked deletions, ignore matching, safe reads, Blob writes, file/directory transitions, and final index publication. `AddCommand` only parses its path, invokes the service, and prints the result.
 
 `IgnoreMatcher` implements the documented small root ignore-file grammar without Git or external programs. `PathUtils` centralizes safe working-tree resolution and portable index paths. `HashUtils` supplies shared SHA-256 ID validation. `JsonUtils` configures fresh pretty printers with explicit LF line endings for deterministic metadata on all operating systems.
+
+## Phase 4 additions
+
+`Tree`, `TreeEntry`, `Commit`, and `AuthorIdentity` are immutable validated models. `ObjectCodec` defines canonical compact JSON payloads, explicit property order, strict semantic decoding, and formatted object inspection. `TreeBuilder` verifies indexed Blobs and constructs directory Trees bottom-up; `TreeReader` verifies and flattens stored snapshots without consulting working files. Traversal bounds limit deep graphs and repeated DAG expansion.
+
+`CommitService` owns the full commit operation, with injectable clock/environment for deterministic tests. It holds index and commit locks, verifies the current parent snapshot, resolves identity, writes and verifies new objects, prepares ref/reflog replacements, rechecks HEAD/ref, and publishes metadata. CLI commands parse arguments and display service results. `ConfigService` provides discovery for repository-local configuration; `ConfigStore` owns its strict schema and atomic updates.
+
+`HeadManager` reads attached symbolic HEAD, and `RefStore` reads/prepares existing branch refs. `MetadataFiles` centralizes bounded, no-follow reads and forced temporary-file writes with atomic replacement. `MetadataLock` owns exclusive marker files. `ReflogStore` prepares a complete replacement containing one additional ref-movement record. A branch ref and reflog are individually atomic; they are not one transaction. See [commits](commits.md) for exact failure and recovery limits.

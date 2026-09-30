@@ -1,4 +1,4 @@
-# Repository format — Phase 1
+# Repository format
 
 All metadata lives in a real `.pocketgit` directory under the working-tree root. Metadata symlinks are rejected during initialization and reinitialization. Files created in this phase are UTF-8; textual line endings are LF on all platforms.
 
@@ -7,11 +7,12 @@ All metadata lives in a real `.pocketgit` directory under the working-tree root.
 | `HEAD` | `ref: refs/heads/main` followed by LF |
 | `index` | JSON object with integer `version: 1` and empty array `entries: []`, followed by LF |
 | `refs/heads/main` | Empty file representing an unborn branch |
-| `objects/` | Empty directory; object formats arrive in Phase 2 |
+| `objects/` | Empty directory; objects use the format below |
 | `refs/heads/` | Directory for branch references |
-| `logs/` | Empty directory; reflog writes arrive in a later phase |
+| `logs/` | Empty directory; commits create `logs/HEAD` |
+| `config` | JSON `{"user":{}}` with LF formatting and a final LF; no fabricated identity |
 
-`config` is exposed by the path abstraction but is not created yet. Author identity configuration belongs to the commit phase. Index entries, hashes, object storage, ignores, reflogs, and command locks are not implemented in Phase 1.
+Phase 4 adds initial `config`. Earlier repositories without it remain compatible: reading settings reports missing identity, and setting a key creates it. Reinitialization preserves existing metadata and does not add configuration to older repositories.
 
 ## Initialization policy
 
@@ -43,7 +44,7 @@ For example, a Blob containing the 11 ASCII bytes `hello world` has canonical by
 fee53a18d32820613c0527aa79be5cb30173c823a9b448fa4817767cc84c6f03
 ```
 
-Blob payloads are raw file bytes. Tree and Commit payload schemas are deliberately not defined here yet; only their envelopes are implemented. The index and refs are untouched by object writes.
+Blob payloads are raw file bytes. Phase 4 defines canonical Tree and Commit JSON payloads in [commits](commits.md). Direct object writes leave the index and refs untouched.
 
 ## Object publication and bounds
 
@@ -75,3 +76,7 @@ Entries sort by Java's lexicographic String order, independent of filesystem tra
 The reader rejects unknown versions/fields, missing or null required values, malformed JSON, duplicate JSON keys, trailing values, numeric coercions, invalid IDs/modes/paths, and indexes above 16 MiB. Phase 1's empty index remains compatible. Field validation is separate from the future whole-repository integrity walk: normal staging creates verified Blobs before publishing references to them.
 
 `index.lock` is an exclusively created marker file held across load, Blob writes, and save. Readers can read an old or new complete index while another process updates it. The writer serializes a complete snapshot into a private `.index-*.tmp`, forces its contents, and atomically replaces `index`. It does not fall back to a non-atomic move. Locks and temporary files are removed on ordinary completion; process termination can leave them behind. See [staging](staging.md) for scope, ignore, symlink, and recovery policies. `add` does not update HEAD, branch refs, or reflogs.
+
+## Commits and configuration — Phase 4
+
+After a commit, the attached branch ref contains the full Commit SHA-256 ID followed by LF. `HEAD` remains symbolic. `logs/HEAD` records old/new IDs, UTC timestamps, and the `commit` operation; the unborn old ID is 64 zeroes. Config settings use `user.name` and `user.email`. `commit.lock` and `index.lock` serialize commits and staging; `config.lock` serializes config updates. [Commits](commits.md) specifies payload schemas, bounds, atomic replacement, and crash recovery.

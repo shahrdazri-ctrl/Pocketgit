@@ -40,6 +40,7 @@ public final class RepositoryInitializer {
         String index = new ObjectMapper().writer(JsonUtils.prettyPrinter())
                 .writeValueAsString(new EmptyIndex(1, List.of())) + "\n";
         writeNew(repository.indexFile(), index);
+        writeNew(repository.configFile(), "{\n  \"user\": {}\n}\n");
         return new InitializationResult(repository, true);
     }
 

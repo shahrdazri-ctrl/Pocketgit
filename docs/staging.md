@@ -1,6 +1,6 @@
 # Staging and add — Phase 3
 
-The index is the proposed file snapshot for the next commit. `add` writes immutable Blob objects and updates index entries; it never changes working-tree files, HEAD, or branch refs. Commits and status arrive in later phases.
+The index is the proposed file snapshot for the next commit. `add` writes immutable Blob objects and updates index entries; it never changes working-tree files, HEAD, or branch refs. [Commits](commits.md) snapshot this index; status arrives in the next phase.
 
 ```bash
 pocketgit add file.txt

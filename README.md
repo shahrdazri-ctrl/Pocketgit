@@ -10,7 +10,7 @@ The plan covers repository initialization, immutable object storage, staging, co
 
 ## Current status
 
-Phases 1–3 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, and staging with `add` and `.pocketgitignore`. Commits, status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
+Phases 1–4 are implemented: Java 21 foundation, executable CLI, safe initialization and discovery, immutable SHA-256 object storage, `cat-object` inspection, staging with `add` and `.pocketgitignore`, deterministic snapshot Trees, author configuration, and commits with parent links and a reflog. Status, history, branching, checkout, diff, and restore remain explicit placeholders that exit with code 3.
 
 ## Build and test
 
@@ -56,7 +56,7 @@ pocketgit cat-object --pretty HASH
 pocketgit cat-object HASH > recovered.bin
 ```
 
-Default output contains only the exact payload bytes, without a header or added newline. `--type` prints `blob`, `tree`, or `commit`; `--size` prints the payload byte length. `--pretty` displays valid UTF-8 text and rejects NUL-containing or invalid UTF-8 payloads. Choose one inspection mode at a time. Every mode validates the complete stored object, including its SHA-256 ID.
+Default output contains only the exact payload bytes, without a header or added newline. `--type` prints `blob`, `tree`, or `commit`; `--size` prints the payload byte length. `--pretty` displays Blob text (rejecting NUL or invalid UTF-8) and formatted, semantically validated Tree/Commit JSON. Choose one inspection mode at a time. Every mode validates the complete stored object, including its SHA-256 ID.
 
 Objects are created by `add` or the Java `ObjectStore` API. See [the object database API](docs/object-database.md) for an example. The default payload limit is 64 MiB. Object writes require filesystem hard-link support, available on typical NTFS, APFS, and ext4 installations; unsupported filesystems fail instead of weakening publication safety.
 
@@ -70,6 +70,20 @@ pocketgit add .
 
 `add .` stages the whole repository, including from nested directories. Other paths resolve from the invocation directory. Files become byte-exact Blob objects; directory scopes also remove index entries for deleted files. Root `.pocketgitignore` rules exclude untracked files, while already indexed files remain tracked. Symlinks and paths outside the repository are rejected. [Staging documentation](docs/staging.md) defines the supported ignore grammar and safety behavior.
 
+## Commit staged changes
+
+```bash
+pocketgit config user.name "Jane Developer"
+pocketgit config user.email "jane@example.com"
+echo hello > hello.txt
+pocketgit add .
+pocketgit commit -m "Initial commit"
+```
+
+Commits capture the index, including staged content and executable modes, even when working files change after `add`. They leave the index and working files intact. The current branch points to the new Commit, with an empty parent list for the first commit and the previous commit as the next commit's parent. Unchanged snapshots print `Nothing to commit.` and exit successfully; `--allow-empty` creates an explicit empty or unchanged commit. Messages must be nonblank and may contain multiple lines.
+
+`config user.name` and `config user.email` read local settings. `POCKETGIT_AUTHOR_NAME` and `POCKETGIT_AUTHOR_EMAIL` override their respective settings; an absent identity produces an actionable error. See [commits](docs/commits.md) for the formats and publication/recovery behavior.
+
 ## Implementation notes
 
 - [Architecture](docs/architecture.md)
@@ -79,5 +93,7 @@ pocketgit add .
 - [Phase 2 validation](docs/phase-2-validation.md)
 - [Staging and ignore rules](docs/staging.md)
 - [Phase 3 validation](docs/phase-3-validation.md)
+- [Trees, commits, configuration, and ref publication](docs/commits.md)
+- [Phase 4 validation](docs/phase-4-validation.md)
 
-The next phase is Tree construction and commit creation. Subsequent work follows the master prompt in order.
+The next phase is the status engine and working-tree comparison. Subsequent work follows the master prompt in order.

@@ -32,7 +32,7 @@ class RepositoryInitializerTest {
         assertEquals(1, index.get("version").asInt());
         assertTrue(index.get("entries").isArray());
         assertTrue(index.get("entries").isEmpty());
-        assertFalse(Files.exists(repo.configFile()));
+        assertTrue(new ObjectMapper().readTree(repo.configFile().toFile()).get("user").isEmpty());
     }
 
     @Test void repeatedInitPreservesEveryFileAndWorkingTree() throws Exception {

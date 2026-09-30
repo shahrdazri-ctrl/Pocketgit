@@ -1,9 +1,11 @@
 package com.pocketgit.services;
 
 import com.pocketgit.model.StoredObject;
+import com.pocketgit.model.ObjectType;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.ObjectStore;
+import com.pocketgit.storage.ObjectCodec;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -20,6 +22,7 @@ public final class ObjectInspectionService {
     }
 
     public String prettyPayload(StoredObject object) throws IOException {
+        if (object.type() != ObjectType.BLOB) return new ObjectCodec().pretty(object);
         byte[] payload = object.payload();
         for (byte value : payload) {
             if (value == 0) throw binaryPrettyError();
