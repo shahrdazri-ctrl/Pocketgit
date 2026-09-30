@@ -39,7 +39,8 @@ public final class RestoreService {
             else {
                 var objects = new ObjectStore(repository);
                 var commit =
-                        new ObjectCodec().decodeCommit(objects.read(objects.resolve(commitPrefix)));
+                        new ObjectCodec()
+                                .decodeCommit(objects.readCommit(objects.resolve(commitPrefix)));
                 source = new TreeReader(objects).readSnapshot(commit.treeHash());
             }
             IndexEntry entry = CheckoutPlanner.entries(source).get(name);
@@ -54,18 +55,32 @@ public final class RestoreService {
                 if (a != null && !a.isDirectory())
                     throw new IOException("restore parent is not a directory: " + parent);
             }
-            var edit = new WorkingTreeEdit(repository, List.of(entry), List.of());
-            try {
-                edit.apply();
-            } catch (IOException | RuntimeException failure) {
+            try (var edit = new WorkingTreeEdit(repository, List.of(entry), List.of())) {
                 try {
-                    edit.rollback();
-                } catch (IOException rollback) {
-                    failure.addSuppressed(rollback);
+                    edit.apply();
+                } catch (IOException | RuntimeException failure) {
+                    try {
+                        edit.rollback();
+                    } catch (IOException rollback) {
+                        failure.addSuppressed(rollback);
+                    }
+                    throw new IOException(
+                            "restore failed; rollback attempted: "
+                                    + failure.getMessage()
+                                    + (failure.getSuppressed().length == 0
+                                            ? ""
+                                            : "; rollback incomplete; "
+                                                    + java.util.Arrays.stream(
+                                                                    failure.getSuppressed())
+                                                            .map(Throwable::getMessage)
+                                                            .collect(
+                                                                    java.util.stream.Collectors
+                                                                            .joining("; "))),
+                            failure);
                 }
-                throw failure;
+                edit.complete();
+                return name;
             }
-            return name;
         }
     }
 }

@@ -2,7 +2,10 @@ package com.pocketgit.services;
 
 import com.pocketgit.model.FileMode;
 import com.pocketgit.model.IndexEntry;
+import com.pocketgit.model.ObjectType;
 import com.pocketgit.repository.Repository;
+import com.pocketgit.storage.MetadataFiles;
+import com.pocketgit.storage.ObjectHasher;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.PathUtils;
 
@@ -15,7 +18,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -25,10 +27,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /** Prepared byte-exact file edits with ordinary-failure rollback; no crash-atomic claim. */
-public final class WorkingTreeEdit {
+public final class WorkingTreeEdit implements AutoCloseable {
     public static final long MAX_BYTES = 256L * 1024 * 1024;
 
-    private record Data(byte[] bytes, Set<PosixFilePermission> permissions) {}
+    private record Data(Path file, long size, String hash, Set<PosixFilePermission> permissions) {}
+
+    private record RecoveryFile(
+            String path, String backup, String blobHash, Set<PosixFilePermission> permissions) {}
 
     private final Repository repository;
     private final Map<String, Data> originals = new LinkedHashMap<>();
@@ -39,9 +44,15 @@ public final class WorkingTreeEdit {
     private final Set<Path> removedDirectories = new HashSet<>();
     private final Set<String> changedFiles = new HashSet<>();
     private final Set<String> publishedFiles = new HashSet<>();
+    private final Set<Path> requiredDirectories = new HashSet<>();
     private final List<String> removals;
+    private final Path backupDirectory;
+    private final Set<Path> backupFiles = new HashSet<>();
     private boolean applied;
     private boolean rolledBack;
+    private boolean completed;
+    private boolean closed;
+    private boolean recoveryFailed;
 
     public WorkingTreeEdit(Repository repository, List<IndexEntry> writes, List<String> deletes)
             throws IOException {
@@ -56,63 +67,149 @@ public final class WorkingTreeEdit {
             throw new IllegalArgumentException("invalid working-tree edit budget");
         this.repository = repository;
         removals = List.copyOf(deletes);
-        var objects = new ObjectStore(repository);
-        long total = 0;
-        var affected = new java.util.TreeSet<>(deletes);
-        writes.forEach(entry -> affected.add(entry.path()));
-        for (String name : affected) {
-            var path = safe(name);
-            var attributes = PathUtils.attributesOrMissing(path);
-            preparedAttributes.put(name, attributes);
-            if (attributes != null && attributes.isRegularFile()) {
-                if (attributes.size() > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES)
-                    throw new IOException("working file exceeds edit limit: " + name);
-                requireBudget(total, attributes.size(), maxBytes);
-                byte[] bytes;
-                int readLimit =
-                        (int) Math.min(ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES, maxBytes - total);
-                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
-                    bytes = input.readNBytes(readLimit + 1);
+        new MetadataFiles(repository).requireDirectory(repository.metadataDirectory());
+        backupDirectory = Files.createTempDirectory(repository.metadataDirectory(), "edit-");
+        try {
+            var objects = new ObjectStore(repository);
+            long total = 0;
+            var affected = new java.util.TreeSet<>(deletes);
+            writes.forEach(entry -> affected.add(entry.path()));
+            for (String name : affected) {
+                var path = safe(name);
+                var attributes = PathUtils.attributesOrMissing(path);
+                preparedAttributes.put(name, attributes);
+                if (attributes != null && attributes.isRegularFile()) {
+                    if (attributes.size() > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES)
+                        throw new IOException("working file exceeds edit limit: " + name);
+                    requireBudget(total, attributes.size(), maxBytes);
+                    var mode = permissions(path);
+                    Path backup = newBackup("original-");
+                    long size =
+                            copyWorkingFile(
+                                    path,
+                                    backup,
+                                    Math.min(
+                                            ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES,
+                                            maxBytes - total));
+                    requireBudget(total, size, maxBytes);
+                    var after =
+                            Files.readAttributes(
+                                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                    if (!sameAttributes(attributes, after)
+                            || size != attributes.size()
+                            || !Objects.equals(mode, permissions(path))) {
+                        throw new IOException("working file changed during preparation: " + name);
+                    }
+                    originals.put(name, new Data(backup, size, hashFile(backup, size), mode));
+                    total += size;
+                } else if (attributes != null && !attributes.isDirectory())
+                    throw new IOException("unsupported working file: " + name);
+                for (Path parent = path.getParent();
+                        parent.startsWith(repository.root());
+                        parent = parent.getParent()) {
+                    if (Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)
+                            && !originalDirectories.containsKey(parent)) {
+                        originalDirectories.put(parent, permissions(parent));
+                    }
+                    if (parent.equals(repository.root())) break;
                 }
-                if (bytes.length > ObjectStore.DEFAULT_MAX_PAYLOAD_BYTES)
-                    throw new IOException("working file exceeds edit limit: " + name);
-                requireBudget(total, bytes.length, maxBytes);
-                var mode = permissions(path);
-                var after =
-                        Files.readAttributes(
-                                path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-                if (!sameAttributes(attributes, after) || bytes.length != attributes.size()) {
-                    throw new IOException("working file changed during preparation: " + name);
-                }
-                originals.put(name, new Data(bytes, mode));
-                total += bytes.length;
-            } else if (attributes != null && !attributes.isDirectory())
-                throw new IOException("unsupported working file: " + name);
-            for (Path parent = path.getParent();
-                    parent.startsWith(repository.root());
-                    parent = parent.getParent()) {
-                if (Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)
-                        && !originalDirectories.containsKey(parent)) {
-                    originalDirectories.put(parent, permissions(parent));
-                }
-                if (parent.equals(repository.root())) break;
             }
+            for (var entry : writes) {
+                for (Path parent = repository.root().resolve(entry.path()).getParent();
+                        !parent.equals(repository.root());
+                        parent = parent.getParent()) {
+                    requiredDirectories.add(parent);
+                }
+                var summary = objects.verifyBlob(entry.blobHash());
+                requireBudget(total, summary.size(), maxBytes);
+                Path content = newBackup("replacement-");
+                try (var channel =
+                                java.nio.channels.FileChannel.open(
+                                        content, java.nio.file.StandardOpenOption.WRITE);
+                        var output = java.nio.channels.Channels.newOutputStream(channel)) {
+                    objects.copyBlob(entry.blobHash(), output);
+                    channel.force(true);
+                }
+                total += summary.size();
+                var existing = originals.get(entry.path());
+                var mode =
+                        existing == null || existing.permissions() == null
+                                ? defaultPermissions()
+                                : new HashSet<>(existing.permissions());
+                mode.remove(PosixFilePermission.OWNER_EXECUTE);
+                mode.remove(PosixFilePermission.GROUP_EXECUTE);
+                mode.remove(PosixFilePermission.OTHERS_EXECUTE);
+                if (entry.mode() == FileMode.EXECUTABLE_FILE)
+                    mode.add(PosixFilePermission.OWNER_EXECUTE);
+                replacements.put(
+                        entry.path(), new Data(content, summary.size(), entry.blobHash(), mode));
+            }
+            var recovery =
+                    originals.entrySet().stream()
+                            .map(
+                                    entry ->
+                                            new RecoveryFile(
+                                                    entry.getKey(),
+                                                    entry.getValue()
+                                                            .file()
+                                                            .getFileName()
+                                                            .toString(),
+                                                    entry.getValue().hash(),
+                                                    entry.getValue().permissions()))
+                            .toList();
+            Path manifest = backupDirectory.resolve("manifest.json");
+            backupFiles.add(manifest);
+            Files.write(
+                    manifest,
+                    new com.fasterxml.jackson.databind.ObjectMapper()
+                            .writeValueAsBytes(
+                                    Map.of(
+                                            "version",
+                                            1,
+                                            "originals",
+                                            recovery,
+                                            "replacements",
+                                            List.copyOf(replacements.keySet()))),
+                    java.nio.file.StandardOpenOption.CREATE_NEW);
+        } catch (IOException | RuntimeException failure) {
+            try {
+                cleanup();
+            } catch (IOException cleanup) {
+                failure.addSuppressed(cleanup);
+            }
+            throw failure;
         }
-        for (var entry : writes) {
-            byte[] bytes = objects.readBlob(entry.blobHash()).content();
-            requireBudget(total, bytes.length, maxBytes);
-            total += bytes.length;
-            var existing = originals.get(entry.path());
-            var mode =
-                    existing == null || existing.permissions() == null
-                            ? defaultPermissions()
-                            : new HashSet<>(existing.permissions());
-            mode.remove(PosixFilePermission.OWNER_EXECUTE);
-            mode.remove(PosixFilePermission.GROUP_EXECUTE);
-            mode.remove(PosixFilePermission.OTHERS_EXECUTE);
-            if (entry.mode() == FileMode.EXECUTABLE_FILE)
-                mode.add(PosixFilePermission.OWNER_EXECUTE);
-            replacements.put(entry.path(), new Data(bytes, mode));
+    }
+
+    private Path newBackup(String prefix) throws IOException {
+        Path file = Files.createTempFile(backupDirectory, prefix, ".data");
+        backupFiles.add(file);
+        return file;
+    }
+
+    private long copyWorkingFile(Path source, Path backup, long limit) throws IOException {
+        long copied = 0;
+        try (var input = Files.newInputStream(source, LinkOption.NOFOLLOW_LINKS);
+                var channel =
+                        java.nio.channels.FileChannel.open(
+                                backup, java.nio.file.StandardOpenOption.WRITE)) {
+            byte[] buffer = new byte[16 * 1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                if (count > limit - copied)
+                    throw new IOException("working file exceeds preparation budget: " + source);
+                copied += count;
+                var bytes = java.nio.ByteBuffer.wrap(buffer, 0, count);
+                while (bytes.hasRemaining()) channel.write(bytes);
+            }
+            channel.force(true);
+        }
+        return copied;
+    }
+
+    private String hashFile(Path file, long size) throws IOException {
+        try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            return new ObjectHasher().hash(ObjectType.BLOB, size, input);
         }
     }
 
@@ -144,7 +241,7 @@ public final class WorkingTreeEdit {
     }
 
     public void apply() throws IOException {
-        if (applied || rolledBack)
+        if (applied || rolledBack || closed)
             throw new IllegalStateException(
                     "working-tree edit has already been applied or rolled back");
         requireUnchanged();
@@ -152,6 +249,9 @@ public final class WorkingTreeEdit {
         var ordered = new ArrayList<>(removals);
         ordered.sort(Comparator.comparingInt(String::length).reversed());
         for (String name : ordered) {
+            // Replacing a regular file is already atomic; deleting it first needlessly
+            // recreates parent directories and changes their permissions and identity.
+            if (replacements.containsKey(name)) continue;
             Path path = safe(name);
             if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
                 Files.delete(path);
@@ -181,13 +281,9 @@ public final class WorkingTreeEdit {
                     before == null ? now == null : now != null && sameAttributes(before, now);
             var original = originals.get(entry.getKey());
             if (unchanged && original != null) {
-                try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
-                    unchanged =
-                            Arrays.equals(
-                                            original.bytes(),
-                                            input.readNBytes(original.bytes().length + 1))
-                                    && Objects.equals(original.permissions(), permissions(path));
-                }
+                unchanged =
+                        original.hash().equals(hashFile(path, original.size()))
+                                && Objects.equals(original.permissions(), permissions(path));
             }
             if (!unchanged)
                 throw new IOException(
@@ -198,6 +294,7 @@ public final class WorkingTreeEdit {
 
     private void prune(Path directory) throws IOException {
         while (!directory.equals(repository.root())
+                && !requiredDirectories.contains(directory)
                 && Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
             try (var children = Files.list(directory)) {
                 if (children.findAny().isPresent()) break;
@@ -225,8 +322,10 @@ public final class WorkingTreeEdit {
             try (var channel =
                     java.nio.channels.FileChannel.open(
                             temporary, java.nio.file.StandardOpenOption.WRITE)) {
-                var buffer = java.nio.ByteBuffer.wrap(data.bytes());
-                while (buffer.hasRemaining()) channel.write(buffer);
+                try (var input = Files.newInputStream(data.file(), LinkOption.NOFOLLOW_LINKS)) {
+                    var output = java.nio.channels.Channels.newOutputStream(channel);
+                    input.transferTo(output);
+                }
                 channel.force(true);
             }
             if (data.permissions() != null
@@ -247,6 +346,7 @@ public final class WorkingTreeEdit {
     }
 
     public void rollback() throws IOException {
+        if (completed) throw new IllegalStateException("working-tree edit is already completed");
         if (!applied || rolledBack) return;
         IOException failure = null;
         var names = new ArrayList<>(publishedFiles);
@@ -301,7 +401,66 @@ public final class WorkingTreeEdit {
                 else failure.addSuppressed(problem);
             }
         }
-        if (failure != null) throw failure;
+        if (failure != null) {
+            recoveryFailed = true;
+            throw new IOException(
+                    "working-tree recovery incomplete; private backups retained at "
+                            + backupDirectory,
+                    failure);
+        }
         rolledBack = true;
+    }
+
+    /** Called only after all cooperating metadata publications have succeeded. */
+    public void complete() {
+        if (!applied || rolledBack || closed || completed)
+            throw new IllegalStateException("edit cannot be completed");
+        completed = true;
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (closed) return;
+        if (recoveryFailed)
+            throw new IOException("private recovery backups retained at " + backupDirectory);
+        if (applied && !completed && !rolledBack) {
+            try {
+                rollback();
+            } catch (IOException failure) {
+                throw new IOException(
+                        "working-tree recovery incomplete; private backups retained at "
+                                + backupDirectory,
+                        failure);
+            }
+        }
+        try {
+            cleanup();
+        } catch (IOException failure) {
+            throw new IOException(
+                    (completed ? "operation completed" : "working-tree changes recovered")
+                            + "; could not clean private preparation directory "
+                            + backupDirectory,
+                    failure);
+        }
+        closed = true;
+    }
+
+    private void cleanup() throws IOException {
+        IOException failure = null;
+        for (Path path : backupFiles) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException problem) {
+                if (failure == null) failure = problem;
+                else failure.addSuppressed(problem);
+            }
+        }
+        try {
+            Files.deleteIfExists(backupDirectory);
+        } catch (IOException problem) {
+            if (failure == null) failure = problem;
+            else failure.addSuppressed(problem);
+        }
+        if (failure != null) throw failure;
     }
 }

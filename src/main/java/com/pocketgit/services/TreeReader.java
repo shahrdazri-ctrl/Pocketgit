@@ -44,7 +44,7 @@ public final class TreeReader {
         if (depth >= TreeBuilder.MAX_DEPTH || !active.add(hash))
             throw new CorruptObjectException("cyclic or excessively deep tree graph");
         try {
-            for (var entry : codec.decodeTree(objects.read(hash)).entries()) {
+            for (var entry : codec.decodeTree(objects.readTree(hash)).entries()) {
                 if (++count[0] > TreeBuilder.MAX_ENTRIES)
                     throw new CorruptObjectException("snapshot exceeds tree entry limit");
                 String path = prefix + entry.name();
@@ -58,7 +58,8 @@ public final class TreeReader {
                             result,
                             count);
                 else {
-                    if (verifiedBlobs.add(entry.objectHash())) objects.readBlob(entry.objectHash());
+                    if (verifiedBlobs.add(entry.objectHash()))
+                        objects.verifyBlob(entry.objectHash());
                     result.add(new IndexEntry(path, entry.objectHash(), entry.mode()));
                 }
             }

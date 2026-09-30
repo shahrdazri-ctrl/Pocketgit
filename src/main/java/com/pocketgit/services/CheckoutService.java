@@ -42,7 +42,9 @@ public final class CheckoutService {
                 ? new Index(1, List.of())
                 : new TreeReader(objects)
                         .readSnapshot(
-                                new ObjectCodec().decodeCommit(objects.read(hash)).treeHash());
+                                new ObjectCodec()
+                                        .decodeCommit(objects.readCommit(hash))
+                                        .treeHash());
     }
 
     public Result checkout(Path cwd, String branch) throws IOException {
@@ -71,74 +73,99 @@ public final class CheckoutService {
             var planner = new CheckoutPlanner();
             var plan = planner.plan(repository, source, index, target);
             if (!plan.conflicts().isEmpty()) throw new CheckoutConflictException(plan.conflicts());
-            var edit = new WorkingTreeEdit(repository, plan.filesToWrite(), plan.filesToDelete());
-            byte[] oldIndex = files.read(repository.indexFile(), IndexStore.MAX_INDEX_BYTES),
-                    oldHead = files.read(repository.headFile(), 4096);
-            Path logPath = repository.logsDirectory().resolve("HEAD");
-            byte[] oldLog;
-            try {
-                oldLog = files.read(logPath, 8 * 1024 * 1024);
-            } catch (NoSuchFileException absent) {
-                oldLog = null;
-            }
-            boolean metadataStarted = false;
-            try (var nextHead =
-                            files.prepare(
-                                    repository.headFile(),
-                                    ("ref: refs/heads/" + branch + "\n")
-                                            .getBytes(StandardCharsets.UTF_8));
-                    var nextLog =
-                            new ReflogStore(repository)
-                                    .prepareAppend(
-                                            sourceHash, targetHash, clock.instant(), "checkout")) {
-                if (!sourceHead.equals(heads.read())
-                        || !Objects.equals(sourceHash, sourceHead.resolve(refs)))
-                    throw new IOException("HEAD changed during checkout");
-                refs.requireUnchanged(branch, targetHash);
-                var recheck = planner.plan(repository, source, indexUpdate.load(), target);
-                if (!recheck.equals(plan))
-                    throw new IOException(
-                            "working tree changed during checkout; retry after inspecting files");
+            try (var edit =
+                    new WorkingTreeEdit(repository, plan.filesToWrite(), plan.filesToDelete())) {
+                byte[] oldIndex = files.read(repository.indexFile(), IndexStore.MAX_INDEX_BYTES),
+                        oldHead = files.read(repository.headFile(), 4096);
+                Path logPath = repository.logsDirectory().resolve("HEAD");
+                byte[] oldLog;
                 try {
-                    edit.apply();
-                    beforePublish.run();
-                    metadataStarted = true;
-                    indexUpdate.save(target);
-                    beforePublish.run();
-                    nextHead.publish();
-                    beforePublish.run();
-                    nextLog.publish();
-                    beforePublish.run();
-                } catch (IOException | RuntimeException failure) {
-                    if (metadataStarted) {
-                        // A blocked index recovery must not prevent independent HEAD/log recovery.
-                        for (var backup :
-                                List.of(
-                                        new Backup(repository.indexFile(), oldIndex),
-                                        new Backup(repository.headFile(), oldHead),
-                                        new Backup(logPath, oldLog))) {
-                            try {
-                                restore(files, backup.path(), backup.bytes());
-                            } catch (IOException rollback) {
-                                failure.addSuppressed(rollback);
+                    oldLog = files.read(logPath, 8 * 1024 * 1024);
+                } catch (NoSuchFileException absent) {
+                    oldLog = null;
+                }
+                boolean metadataStarted = false;
+                boolean completed = false;
+                try (var nextHead =
+                                files.prepare(
+                                        repository.headFile(),
+                                        ("ref: refs/heads/" + branch + "\n")
+                                                .getBytes(StandardCharsets.UTF_8));
+                        var nextLog =
+                                new ReflogStore(repository)
+                                        .prepareAppend(
+                                                sourceHash,
+                                                targetHash,
+                                                clock.instant(),
+                                                "checkout")) {
+                    if (!sourceHead.equals(heads.read())
+                            || !Objects.equals(sourceHash, sourceHead.resolve(refs)))
+                        throw new IOException("HEAD changed during checkout");
+                    refs.requireUnchanged(branch, targetHash);
+                    var recheck = planner.plan(repository, source, indexUpdate.load(), target);
+                    if (!recheck.equals(plan))
+                        throw new IOException(
+                                "working tree changed during checkout; retry after inspecting"
+                                        + " files");
+                    try {
+                        edit.apply();
+                        beforePublish.run();
+                        metadataStarted = true;
+                        indexUpdate.save(target);
+                        beforePublish.run();
+                        nextHead.publish();
+                        beforePublish.run();
+                        nextLog.publish();
+                        beforePublish.run();
+                    } catch (IOException | RuntimeException failure) {
+                        if (metadataStarted) {
+                            // A blocked index recovery must not prevent independent HEAD/log
+                            // recovery.
+                            for (var backup :
+                                    List.of(
+                                            new Backup(repository.indexFile(), oldIndex),
+                                            new Backup(repository.headFile(), oldHead),
+                                            new Backup(logPath, oldLog))) {
+                                try {
+                                    restore(files, backup.path(), backup.bytes());
+                                } catch (IOException rollback) {
+                                    failure.addSuppressed(rollback);
+                                }
                             }
                         }
+                        try {
+                            edit.rollback();
+                        } catch (IOException rollback) {
+                            failure.addSuppressed(rollback);
+                        }
+                        throw new IOException(
+                                "checkout failed; rollback attempted: "
+                                        + failure.getMessage()
+                                        + (failure.getSuppressed().length == 0
+                                                ? ""
+                                                : "; rollback incomplete, inspect repository; "
+                                                        + java.util.Arrays.stream(
+                                                                        failure.getSuppressed())
+                                                                .map(Throwable::getMessage)
+                                                                .collect(
+                                                                        java.util.stream.Collectors
+                                                                                .joining("; "))),
+                                failure);
                     }
-                    try {
-                        edit.rollback();
-                    } catch (IOException rollback) {
-                        failure.addSuppressed(rollback);
+                    // Cleanup errors must not roll files back after metadata has committed.
+                    edit.complete();
+                    completed = true;
+                } catch (IOException failure) {
+                    if (completed) {
+                        throw new IOException(
+                                "checkout completed; metadata temporary-file cleanup failed: "
+                                        + failure.getMessage(),
+                                failure);
                     }
-                    throw new IOException(
-                            "checkout failed; rollback attempted: "
-                                    + failure.getMessage()
-                                    + (failure.getSuppressed().length == 0
-                                            ? ""
-                                            : "; rollback incomplete, inspect repository"),
-                            failure);
+                    throw failure;
                 }
+                return new Result(true, branch);
             }
-            return new Result(true, branch);
         }
     }
 

@@ -105,12 +105,16 @@ public final class IntegrityChecker {
                             try {
                                 if (!hash.matches("[0-9a-f]{64}"))
                                     throw new IOException("illegal object filename");
-                                StoredObject object = store.read(hash);
-                                types.put(hash, object.type());
-                                switch (object.type()) {
+                                var summary = store.verify(hash);
+                                types.put(hash, summary.type());
+                                switch (summary.type()) {
                                     case BLOB -> blobs++;
-                                    case TREE -> trees.put(hash, codec.decodeTree(object));
-                                    case COMMIT -> commits.put(hash, codec.decodeCommit(object));
+                                    case TREE ->
+                                            trees.put(hash, codec.decodeTree(store.readTree(hash)));
+                                    case COMMIT ->
+                                            commits.put(
+                                                    hash,
+                                                    codec.decodeCommit(store.readCommit(hash)));
                                 }
                             } catch (IOException bad) {
                                 errors.add("object " + hash + ": " + bad.getMessage());

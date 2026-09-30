@@ -8,6 +8,7 @@ import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.repository.WorkingTree;
 import com.pocketgit.storage.IndexStore;
 import com.pocketgit.storage.ObjectStore;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -17,8 +18,10 @@ import java.util.TreeMap;
 
 public final class StatusService {
     public RepositoryStatus status(Path cwd) throws IOException {
-        var root = new RepositoryLocator().findRepositoryRoot(cwd)
-                .orElseThrow(() -> new IOException("not a PocketGit repository"));
+        var root =
+                new RepositoryLocator()
+                        .findRepositoryRoot(cwd)
+                        .orElseThrow(() -> new IOException("not a PocketGit repository"));
         var repository = new Repository(root);
         var heads = new HeadSnapshotReader();
         var head = heads.read(repository);
@@ -26,10 +29,12 @@ public final class StatusService {
         Index index = indexes.load();
         var objects = new ObjectStore(repository);
         var verified = new HashSet<String>();
-        for (var entry : index.entries()) if (verified.add(entry.blobHash())) objects.readBlob(entry.blobHash());
+        for (var entry : index.entries())
+            if (verified.add(entry.blobHash())) objects.verifyBlob(entry.blobHash());
         var working = new WorkingTree().read(repository, index);
         // Observe complete atomic snapshots without creating locks or other metadata.
-        if (!indexes.load().equals(index)) throw new IOException("index changed during status; retry status");
+        if (!indexes.load().equals(index))
+            throw new IOException("index changed during status; retry status");
         heads.requireUnchanged(repository, head);
 
         var committed = entries(head.index());
@@ -47,9 +52,18 @@ public final class StatusService {
             if (!files.containsKey(path)) unstagedDeleted.add(path);
             else if (!entry.getValue().equals(files.get(path))) unstagedModified.add(path);
         }
-        for (String path : committed.keySet()) if (!staged.containsKey(path)) stagedDeleted.add(path);
-        return new RepositoryStatus(head.branch(), head.commitHash() != null, stagedNew, stagedModified, stagedDeleted,
-                unstagedModified, unstagedDeleted, working.untracked(), working.ignored());
+        for (String path : committed.keySet())
+            if (!staged.containsKey(path)) stagedDeleted.add(path);
+        return new RepositoryStatus(
+                head.branch(),
+                head.commitHash() != null,
+                stagedNew,
+                stagedModified,
+                stagedDeleted,
+                unstagedModified,
+                unstagedDeleted,
+                working.untracked(),
+                working.ignored());
     }
 
     private Map<String, IndexEntry> entries(Index index) {

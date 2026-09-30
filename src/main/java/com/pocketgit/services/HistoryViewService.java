@@ -96,7 +96,8 @@ public final class HistoryViewService {
         var lanes = new HashMap<String, Integer>();
         var traversal = new LogService();
         var entries =
-                traversal.traverseRoots(roots, hash -> codec.decodeCommit(objects.read(hash)));
+                traversal.traverseRoots(
+                        roots, hash -> codec.decodeCommit(objects.readCommit(hash)));
         entries.forEach(entry -> commits.put(entry.hash(), entry.commit()));
         int lane = 0;
         for (String root : roots) {
@@ -153,12 +154,12 @@ public final class HistoryViewService {
         var objects = new ObjectStore(locate(cwd));
         var codec = new ObjectCodec();
         String hash = objects.resolve(prefix);
-        var commit = codec.decodeCommit(objects.read(hash));
+        var commit = codec.decodeCommit(objects.readCommit(hash));
         var trees = new TreeReader(objects);
         var after = entries(trees.readSnapshot(commit.treeHash()).entries());
         Map<String, IndexEntry> before = Map.of();
         if (!commit.parentHashes().isEmpty()) {
-            var parent = codec.decodeCommit(objects.read(commit.parentHashes().getFirst()));
+            var parent = codec.decodeCommit(objects.readCommit(commit.parentHashes().getFirst()));
             before = entries(trees.readSnapshot(parent.treeHash()).entries());
         }
         var paths = new TreeSet<>(before.keySet());

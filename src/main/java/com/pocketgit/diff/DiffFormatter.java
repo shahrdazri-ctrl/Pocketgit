@@ -3,6 +3,7 @@ package com.pocketgit.diff;
 import com.pocketgit.model.FileMode;
 import com.pocketgit.util.TerminalText;
 
+import java.io.IOException;
 import java.util.List;
 
 public final class DiffFormatter {
@@ -12,6 +13,15 @@ public final class DiffFormatter {
 
     public String format(List<DiffResult> results) {
         var text = new StringBuilder();
+        try {
+            write(results, text);
+        } catch (IOException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+        return text.toString();
+    }
+
+    public void write(List<DiffResult> results, Appendable text) throws IOException {
         for (var result : results) {
             text.append("diff --pocketgit a/")
                     .append(result.path())
@@ -41,27 +51,26 @@ public final class DiffFormatter {
                     .append('\n');
             for (var hunk : result.hunks()) {
                 text.append("@@ -")
-                        .append(hunk.oldStart())
+                        .append(Integer.toString(hunk.oldStart()))
                         .append(',')
-                        .append(hunk.oldCount())
+                        .append(Integer.toString(hunk.oldCount()))
                         .append(" +")
-                        .append(hunk.newStart())
+                        .append(Integer.toString(hunk.newStart()))
                         .append(',')
-                        .append(hunk.newCount())
+                        .append(Integer.toString(hunk.newCount()))
                         .append(" @@\n");
                 for (var line : hunk.lines()) {
                     text.append(
-                                    switch (line.type()) {
-                                        case CONTEXT -> ' ';
-                                        case ADDED -> '+';
-                                        case REMOVED -> '-';
-                                    })
-                            .append(TerminalText.escape(line.text()))
-                            .append('\n');
+                            switch (line.type()) {
+                                case CONTEXT -> ' ';
+                                case ADDED -> '+';
+                                case REMOVED -> '-';
+                            });
+                    TerminalText.appendEscaped(line.text(), text);
+                    text.append('\n');
                     if (!line.terminated()) text.append("\\ No newline at end of file\n");
                 }
             }
         }
-        return text.toString();
     }
 }

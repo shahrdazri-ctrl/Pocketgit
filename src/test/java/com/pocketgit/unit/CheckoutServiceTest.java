@@ -1,157 +1,448 @@
 package com.pocketgit.unit;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.pocketgit.model.*;
 import com.pocketgit.refs.*;
 import com.pocketgit.repository.*;
 import com.pocketgit.services.*;
 import com.pocketgit.storage.*;
 import com.pocketgit.util.FileModeUtils;
+
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Clock;
 import java.util.*;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class CheckoutServiceTest {
-    @TempDir Path root; private Repository repo;
+    @TempDir Path root;
+    private Repository repo;
     private final CheckoutService checkout = new CheckoutService();
-    @BeforeEach void initialize() throws Exception {
-        repo=new RepositoryInitializer().initialize(root).repository();
-        new ConfigStore(repo).set("user.name","Reviewer"); new ConfigStore(repo).set("user.email","reviewer@example.com");
-    }
-    private void file(String name,String text) throws Exception { Path path=root.resolve(name); Files.createDirectories(path.getParent()); Files.writeString(path,text); }
-    private void commit(String message) throws Exception { new AddService().add(root,Path.of(".")); new CommitService().commit(root,message,false); }
-    private void branch() throws Exception { new BranchService().create(root,"feature"); }
-    private Map<String,byte[]> state() throws Exception {
-        var result=new TreeMap<String,byte[]>(); try(var paths=Files.walk(root)) { for(var path:paths.filter(Files::isRegularFile).toList()) result.put(root.relativize(path).toString(),Files.readAllBytes(path)); } return result;
-    }
-    private void same(Map<String,byte[]> before) throws Exception { var after=state(); assertEquals(before.keySet(),after.keySet()); before.forEach((p,b)->assertArrayEquals(b,after.get(p),p)); }
-    @Test void switchesFilesAddsDeletesAndUpdatesIndexHeadAndReflog() throws Exception {
-        file("src/old","old"); file("same","unchanged"); commit("initial"); branch();
-        Files.delete(root.resolve("src/old")); file("new/path","new"); commit("second");
-        file("private","untracked"); file("same","unrelated local edit");
-        assertTrue(checkout.checkout(root,"feature").changed());
-        assertEquals("old",Files.readString(root.resolve("src/old"))); assertFalse(Files.exists(root.resolve("new/path")));
-        assertEquals("untracked",Files.readString(root.resolve("private"))); assertEquals("unrelated local edit",Files.readString(root.resolve("same")));
-        assertEquals("feature",new HeadManager(repo).readBranch());
-        assertEquals(new HeadSnapshotReader().read(repo).index(),new IndexStore(repo).load());
-        assertTrue(Files.readString(repo.logsDirectory().resolve("HEAD")).endsWith(" checkout\n"));
-        checkout.checkout(root,"main"); assertEquals("new",Files.readString(root.resolve("new/path"))); assertFalse(Files.exists(root.resolve("src/old")));
-    }
-    @Test void unstagedEditOrDeletionConflictMakesZeroChanges() throws Exception {
-        file("a","first"); commit("first"); branch(); file("a","second"); commit("second");
-        file("a","private local edit"); var before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-        Files.delete(root.resolve("a")); before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void stagedEditsCannotBeLost() throws Exception {
-        file("a","first"); commit("first"); branch(); file("b","staged"); new AddService().add(root,Path.of("b"));
-        var before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void untrackedAndIgnoredTargetFilesAreProtected() throws Exception {
-        file("a","base"); file("secret","tracked first"); commit("first"); branch(); Files.delete(root.resolve("secret")); commit("delete");
-        file("secret","private"); var before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-        file(".pocketgitignore","secret\n"); before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void sameBranchDoesNotRewriteLocalWork() throws Exception {
-        file("a","base"); commit("base"); file("a","local edit"); var before=state();
-        assertFalse(checkout.checkout(root,"main").changed()); same(before);
-    }
-    @Test void fileDirectoryTransitionsAreReversible() throws Exception {
-        file("a","file"); commit("file"); branch(); Files.delete(root.resolve("a")); file("a/b/c","nested"); commit("directory");
-        checkout.checkout(root,"feature"); assertEquals("file",Files.readString(root.resolve("a")));
-        checkout.checkout(root,"main"); assertEquals("nested",Files.readString(root.resolve("a/b/c")));
-    }
-    @Test void untrackedDescendantPreventsDirectoryReplacement() throws Exception {
-        file("a","file"); commit("file"); branch(); Files.delete(root.resolve("a")); file("a/tracked","tracked"); commit("directory");
-        file("a/private","do not delete"); var before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void untrackedFileObstructingParentDirectoryIsProtected() throws Exception {
-        file("a/b","nested"); commit("directory"); branch(); Files.delete(root.resolve("a/b")); Files.delete(root.resolve("a")); commit("empty");
-        file("a","private"); var before=state(); assertThrows(CheckoutConflictException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void missingBranchAndCorruptTargetDoNotTouchFiles() throws Exception {
-        file("a","base"); commit("base"); branch(); var before=state();
-        assertThrows(IOException.class,()->checkout.checkout(root,"missing")); assertThrows(IOException.class,()->checkout.checkout(root,"../escape")); same(before);
-        String hash=new RefStore(repo).readBranch("feature"); var objects=new ObjectStore(repo); Files.writeString(objects.pathForHash(hash),"corrupt"); before=state();
-        assertThrows(IOException.class,()->checkout.checkout(root,"feature")); same(before);
-    }
-    @Test void failureAfterFileEditsRollsBackContentModesDirectoriesAndMetadata() throws Exception {
-        file("a","file"); file("deleted","first"); commit("first"); branch(); Files.delete(root.resolve("a")); Files.delete(root.resolve("deleted")); file("a/b","directory"); commit("second");
-        var before=state(); var failing=new CheckoutService(Clock.systemUTC(),()->{throw new IOException("injected failure");});
-        assertThrows(IOException.class,()->failing.checkout(root,"feature")); same(before);
-        assertEquals("main",new HeadManager(repo).readBranch()); assertTrue(Files.isDirectory(root.resolve("a")));
-    }
-    @Test void failedDirectoryToFileCheckoutRestoresPrivateDirectoryPermissions() throws Exception {
-        assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
-        file("a","file"); commit("file"); branch(); Files.delete(root.resolve("a"));
-        file("a/sub/private","private contents"); commit("directory");
-        var privatePermissions=java.nio.file.attribute.PosixFilePermissions.fromString("rwx------");
-        Files.setPosixFilePermissions(root.resolve("a"),privatePermissions);
-        Files.setPosixFilePermissions(root.resolve("a/sub"),privatePermissions);
-        var before=state(); var failing=new CheckoutService(Clock.systemUTC(),()->{throw new IOException("injected failure");});
-        assertThrows(IOException.class,()->failing.checkout(root,"feature")); same(before);
-        assertEquals(privatePermissions,Files.getPosixFilePermissions(root.resolve("a")));
-        assertEquals(privatePermissions,Files.getPosixFilePermissions(root.resolve("a/sub")));
-    }
-    @Test void rollbackContinuesRestoringOtherFilesAfterDirectoryRecoveryFails() throws Exception {
-        Path outside=Files.createTempDirectory(root.getParent(),"rollback-outside");
-        try { Files.createSymbolicLink(root.resolve("probe"),outside); Files.delete(root.resolve("probe")); }
-        catch(IOException|UnsupportedOperationException failure) { assumeTrue(false,"symlinks unavailable"); }
-        file("a","file"); file("z","feature"); commit("file"); branch(); Files.delete(root.resolve("a"));
-        file("a/sub/private","private"); file("z","main"); commit("directory");
-        var failing=new CheckoutService(Clock.systemUTC(),()->{
-            Files.delete(root.resolve("a")); Files.createSymbolicLink(root.resolve("a"),outside);
-            throw new IOException("directory obstructed during recovery");
-        });
-        var failure=assertThrows(IOException.class,()->failing.checkout(root,"feature"));
-        assertTrue(failure.getMessage().contains("rollback incomplete"));
-        assertEquals("main",Files.readString(root.resolve("z")));
-        assertEquals("main",new HeadManager(repo).readBranch());
-        try(var paths=Files.list(outside)) { assertEquals(0,paths.count()); }
-    }
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(ints={2,3,4})
-    void failureAfterEachMetadataPublicationRestoresOriginalBytes(int failAt) throws Exception {
-        file("a","first"); commit("first"); branch(); file("a","second"); commit("second");
-        var before=state(); var calls=new java.util.concurrent.atomic.AtomicInteger();
-        var failing=new CheckoutService(Clock.systemUTC(),()->{if(calls.incrementAndGet()==failAt)throw new IOException("publication failure");});
-        assertThrows(IOException.class,()->failing.checkout(root,"feature")); same(before);
-    }
-    @Test void preservesExecutableDistinction() throws Exception {
-        file("script","echo test"); assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
-        Files.setPosixFilePermissions(root.resolve("script"),java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x")); commit("executable"); branch();
-        Files.setPosixFilePermissions(root.resolve("script"),java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--")); commit("regular");
-        checkout.checkout(root,"feature"); assertEquals(FileMode.EXECUTABLE_FILE,FileModeUtils.fileMode(root.resolve("script")));
-        checkout.checkout(root,"main"); assertEquals(FileMode.REGULAR_FILE,FileModeUtils.fileMode(root.resolve("script")));
-    }
-    @Test void symlinkObstructionsCannotWriteOutsideRepository() throws Exception {
-        file("a/b","nested"); commit("first"); branch(); Files.delete(root.resolve("a/b")); Files.delete(root.resolve("a")); commit("delete");
-        Path outside=Files.createTempDirectory(root.getParent(),"checkout-outside");
-        try { Files.createSymbolicLink(root.resolve("a"),outside); } catch(IOException|UnsupportedOperationException failure) { assumeTrue(false,"symlinks unavailable"); }
-        assertThrows(IOException.class,()->checkout.checkout(root,"feature")); try(var files=Files.list(outside)) { assertEquals(0,files.count()); }
-        assertEquals("main",new HeadManager(repo).readBranch());
+
+    @BeforeEach
+    void initialize() throws Exception {
+        repo = new RepositoryInitializer().initialize(root).repository();
+        new ConfigStore(repo).set("user.name", "Reviewer");
+        new ConfigStore(repo).set("user.email", "reviewer@example.com");
     }
 
-    @Test void metadataRecoveryContinuesAfterIndexRecoveryIsBlocked() throws Exception {
+    private void file(String name, String text) throws Exception {
+        Path path = root.resolve(name);
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, text);
+    }
+
+    private void commit(String message) throws Exception {
+        new AddService().add(root, Path.of("."));
+        new CommitService().commit(root, message, false);
+    }
+
+    private void branch() throws Exception {
+        new BranchService().create(root, "feature");
+    }
+
+    private Map<String, byte[]> state() throws Exception {
+        var result = new TreeMap<String, byte[]>();
+        try (var paths = Files.walk(root)) {
+            for (var path : paths.filter(Files::isRegularFile).toList())
+                result.put(root.relativize(path).toString(), Files.readAllBytes(path));
+        }
+        return result;
+    }
+
+    private void same(Map<String, byte[]> before) throws Exception {
+        var after = state();
+        assertEquals(before.keySet(), after.keySet());
+        before.forEach((p, b) -> assertArrayEquals(b, after.get(p), p));
+    }
+
+    @Test
+    void switchesFilesAddsDeletesAndUpdatesIndexHeadAndReflog() throws Exception {
+        file("src/old", "old");
+        file("same", "unchanged");
+        commit("initial");
+        branch();
+        Files.delete(root.resolve("src/old"));
+        file("new/path", "new");
+        commit("second");
+        file("private", "untracked");
+        file("same", "unrelated local edit");
+        assertTrue(checkout.checkout(root, "feature").changed());
+        assertEquals("old", Files.readString(root.resolve("src/old")));
+        assertFalse(Files.exists(root.resolve("new/path")));
+        assertEquals("untracked", Files.readString(root.resolve("private")));
+        assertEquals("unrelated local edit", Files.readString(root.resolve("same")));
+        assertEquals("feature", new HeadManager(repo).readBranch());
+        assertEquals(new HeadSnapshotReader().read(repo).index(), new IndexStore(repo).load());
+        assertTrue(Files.readString(repo.logsDirectory().resolve("HEAD")).endsWith(" checkout\n"));
+        checkout.checkout(root, "main");
+        assertEquals("new", Files.readString(root.resolve("new/path")));
+        assertFalse(Files.exists(root.resolve("src/old")));
+    }
+
+    @Test
+    void unstagedEditOrDeletionConflictMakesZeroChanges() throws Exception {
+        file("a", "first");
+        commit("first");
+        branch();
+        file("a", "second");
+        commit("second");
+        file("a", "private local edit");
+        var before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+        Files.delete(root.resolve("a"));
+        before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void stagedEditsCannotBeLost() throws Exception {
+        file("a", "first");
+        commit("first");
+        branch();
+        file("b", "staged");
+        new AddService().add(root, Path.of("b"));
+        var before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void untrackedAndIgnoredTargetFilesAreProtected() throws Exception {
+        file("a", "base");
+        file("secret", "tracked first");
+        commit("first");
+        branch();
+        Files.delete(root.resolve("secret"));
+        commit("delete");
+        file("secret", "private");
+        var before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+        file(".pocketgitignore", "secret\n");
+        before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void sameBranchDoesNotRewriteLocalWork() throws Exception {
+        file("a", "base");
+        commit("base");
+        file("a", "local edit");
+        var before = state();
+        assertFalse(checkout.checkout(root, "main").changed());
+        same(before);
+    }
+
+    @Test
+    void fileDirectoryTransitionsAreReversible() throws Exception {
+        file("a", "file");
+        commit("file");
+        branch();
+        Files.delete(root.resolve("a"));
+        file("a/b/c", "nested");
+        commit("directory");
+        checkout.checkout(root, "feature");
+        assertEquals("file", Files.readString(root.resolve("a")));
+        checkout.checkout(root, "main");
+        assertEquals("nested", Files.readString(root.resolve("a/b/c")));
+    }
+
+    @Test
+    void untrackedDescendantPreventsDirectoryReplacement() throws Exception {
+        file("a", "file");
+        commit("file");
+        branch();
+        Files.delete(root.resolve("a"));
+        file("a/tracked", "tracked");
+        commit("directory");
+        file("a/private", "do not delete");
+        var before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void untrackedFileObstructingParentDirectoryIsProtected() throws Exception {
+        file("a/b", "nested");
+        commit("directory");
+        branch();
+        Files.delete(root.resolve("a/b"));
+        Files.delete(root.resolve("a"));
+        commit("empty");
+        file("a", "private");
+        var before = state();
+        assertThrows(CheckoutConflictException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void missingBranchAndCorruptTargetDoNotTouchFiles() throws Exception {
+        file("a", "base");
+        commit("base");
+        branch();
+        var before = state();
+        assertThrows(IOException.class, () -> checkout.checkout(root, "missing"));
+        assertThrows(IOException.class, () -> checkout.checkout(root, "../escape"));
+        same(before);
+        String hash = new RefStore(repo).readBranch("feature");
+        var objects = new ObjectStore(repo);
+        Files.writeString(objects.pathForHash(hash), "corrupt");
+        before = state();
+        assertThrows(IOException.class, () -> checkout.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void failureAfterFileEditsRollsBackContentModesDirectoriesAndMetadata() throws Exception {
+        file("a", "file");
+        file("deleted", "first");
+        commit("first");
+        branch();
+        Files.delete(root.resolve("a"));
+        Files.delete(root.resolve("deleted"));
+        file("a/b", "directory");
+        commit("second");
+        var before = state();
+        var failing =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            throw new IOException("injected failure");
+                        });
+        assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
+        same(before);
+        assertEquals("main", new HeadManager(repo).readBranch());
+        assertTrue(Files.isDirectory(root.resolve("a")));
+    }
+
+    @Test
+    void failedDirectoryToFileCheckoutRestoresPrivateDirectoryPermissions() throws Exception {
+        assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
+        file("a", "file");
+        commit("file");
+        branch();
+        Files.delete(root.resolve("a"));
+        file("a/sub/private", "private contents");
+        commit("directory");
+        var privatePermissions =
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwx------");
+        Files.setPosixFilePermissions(root.resolve("a"), privatePermissions);
+        Files.setPosixFilePermissions(root.resolve("a/sub"), privatePermissions);
+        var before = state();
+        var failing =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            throw new IOException("injected failure");
+                        });
+        assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
+        same(before);
+        assertEquals(privatePermissions, Files.getPosixFilePermissions(root.resolve("a")));
+        assertEquals(privatePermissions, Files.getPosixFilePermissions(root.resolve("a/sub")));
+    }
+
+    @Test
+    void rollbackContinuesRestoringOtherFilesAfterDirectoryRecoveryFails() throws Exception {
+        Path outside = Files.createTempDirectory(root.getParent(), "rollback-outside");
+        try {
+            Files.createSymbolicLink(root.resolve("probe"), outside);
+            Files.delete(root.resolve("probe"));
+        } catch (IOException | UnsupportedOperationException failure) {
+            assumeTrue(false, "symlinks unavailable");
+        }
+        file("a", "file");
+        file("z", "feature");
+        commit("file");
+        branch();
+        Files.delete(root.resolve("a"));
+        file("a/sub/private", "private");
+        file("z", "main");
+        commit("directory");
+        var failing =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            Files.delete(root.resolve("a"));
+                            Files.createSymbolicLink(root.resolve("a"), outside);
+                            throw new IOException("directory obstructed during recovery");
+                        });
+        var failure = assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
+        assertTrue(failure.getMessage().contains("rollback incomplete"));
+        assertEquals("main", Files.readString(root.resolve("z")));
+        assertEquals("main", new HeadManager(repo).readBranch());
+        try (var paths = Files.list(outside)) {
+            assertEquals(0, paths.count());
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {2, 3, 4})
+    void failureAfterEachMetadataPublicationRestoresOriginalBytes(int failAt) throws Exception {
+        file("a", "first");
+        commit("first");
+        branch();
+        file("a", "second");
+        commit("second");
+        var before = state();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var failing =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            if (calls.incrementAndGet() == failAt)
+                                throw new IOException("publication failure");
+                        });
+        assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
+        same(before);
+    }
+
+    @Test
+    void preservesExecutableDistinction() throws Exception {
+        file("script", "echo test");
+        assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
+        Files.setPosixFilePermissions(
+                root.resolve("script"),
+                java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+        commit("executable");
+        branch();
+        Files.setPosixFilePermissions(
+                root.resolve("script"),
+                java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        commit("regular");
+        checkout.checkout(root, "feature");
+        assertEquals(FileMode.EXECUTABLE_FILE, FileModeUtils.fileMode(root.resolve("script")));
+        checkout.checkout(root, "main");
+        assertEquals(FileMode.REGULAR_FILE, FileModeUtils.fileMode(root.resolve("script")));
+    }
+
+    @Test
+    void successfulSwitchPreservesExistingDirectoryPermissions() throws Exception {
+        assumeTrue(Files.getFileStore(root).supportsFileAttributeView("posix"));
+        file("private/sub/data", "first");
+        commit("first");
+        branch();
+        file("private/sub/data", "second");
+        commit("second");
+        var mode = java.nio.file.attribute.PosixFilePermissions.fromString("rwx--x---");
+        Files.setPosixFilePermissions(root.resolve("private"), mode);
+        Files.setPosixFilePermissions(root.resolve("private/sub"), mode);
+        Object directoryKey =
+                Files.readAttributes(
+                                root.resolve("private/sub"),
+                                java.nio.file.attribute.BasicFileAttributes.class)
+                        .fileKey();
+        checkout.checkout(root, "feature");
+        assertEquals("first", Files.readString(root.resolve("private/sub/data")));
+        assertEquals(mode, Files.getPosixFilePermissions(root.resolve("private")));
+        assertEquals(mode, Files.getPosixFilePermissions(root.resolve("private/sub")));
+        assertEquals(
+                directoryKey,
+                Files.readAttributes(
+                                root.resolve("private/sub"),
+                                java.nio.file.attribute.BasicFileAttributes.class)
+                        .fileKey());
+    }
+
+    @Test
+    void symlinkObstructionsCannotWriteOutsideRepository() throws Exception {
+        file("a/b", "nested");
+        commit("first");
+        branch();
+        Files.delete(root.resolve("a/b"));
+        Files.delete(root.resolve("a"));
+        commit("delete");
+        Path outside = Files.createTempDirectory(root.getParent(), "checkout-outside");
+        try {
+            Files.createSymbolicLink(root.resolve("a"), outside);
+        } catch (IOException | UnsupportedOperationException failure) {
+            assumeTrue(false, "symlinks unavailable");
+        }
+        assertThrows(IOException.class, () -> checkout.checkout(root, "feature"));
+        try (var files = Files.list(outside)) {
+            assertEquals(0, files.count());
+        }
+        assertEquals("main", new HeadManager(repo).readBranch());
+    }
+
+    @Test
+    void cleanupFailureAfterPublicationKeepsWorkingFilesConsistentWithPublishedHead()
+            throws Exception {
+        file("a", "feature bytes");
+        commit("feature");
+        branch();
+        file("a", "main bytes");
+        commit("main");
+        var temporary = new java.util.concurrent.atomic.AtomicReference<Path>();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var obstructed =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            int call = calls.incrementAndGet();
+                            if (call == 1) {
+                                try (var paths = Files.list(repo.metadataDirectory())) {
+                                    temporary.set(
+                                            paths.filter(
+                                                            path ->
+                                                                    path.getFileName()
+                                                                            .toString()
+                                                                            .startsWith(
+                                                                                    ".metadata-"))
+                                                    .findFirst()
+                                                    .orElseThrow());
+                                }
+                            } else if (call == 4) {
+                                // The published temporary name is now absent. Simulate a cleanup
+                                // obstruction.
+                                Files.createDirectory(temporary.get());
+                                Files.writeString(
+                                        temporary.get().resolve("private"), "preserve obstruction");
+                            }
+                        });
+        var failure = assertThrows(IOException.class, () -> obstructed.checkout(root, "feature"));
+        assertTrue(failure.getMessage().contains("checkout completed"));
+        assertEquals("feature", new HeadManager(repo).readBranch());
+        assertEquals(new HeadSnapshotReader().read(repo).index(), new IndexStore(repo).load());
+        assertEquals("feature bytes", Files.readString(root.resolve("a")));
+        assertEquals("preserve obstruction", Files.readString(temporary.get().resolve("private")));
+    }
+
+    @Test
+    void metadataRecoveryContinuesAfterIndexRecoveryIsBlocked() throws Exception {
         Path outside = Files.createTempFile(root.getParent(), "checkout-recovery-outside", ".txt");
         Files.writeString(outside, "outside must stay untouched");
-        try { Files.createSymbolicLink(root.resolve("probe"), outside); Files.delete(root.resolve("probe")); }
-        catch (IOException | UnsupportedOperationException unsupported) { assumeTrue(false, "symlinks unavailable"); }
-        file("a", "feature bytes"); commit("feature"); branch();
-        file("a", "main bytes"); commit("main");
+        try {
+            Files.createSymbolicLink(root.resolve("probe"), outside);
+            Files.delete(root.resolve("probe"));
+        } catch (IOException | UnsupportedOperationException unsupported) {
+            assumeTrue(false, "symlinks unavailable");
+        }
+        file("a", "feature bytes");
+        commit("feature");
+        branch();
+        file("a", "main bytes");
+        commit("main");
         byte[] oldHead = Files.readAllBytes(repo.headFile());
         byte[] oldLog = Files.readAllBytes(repo.logsDirectory().resolve("HEAD"));
         var calls = new java.util.concurrent.atomic.AtomicInteger();
-        var failing = new CheckoutService(Clock.systemUTC(), () -> {
-            if (calls.incrementAndGet() == 3) {
-                Files.delete(repo.indexFile());
-                Files.createSymbolicLink(repo.indexFile(), outside);
-                throw new IOException("index obstructed after HEAD publication");
-            }
-        });
+        var failing =
+                new CheckoutService(
+                        Clock.systemUTC(),
+                        () -> {
+                            if (calls.incrementAndGet() == 3) {
+                                Files.delete(repo.indexFile());
+                                Files.createSymbolicLink(repo.indexFile(), outside);
+                                throw new IOException("index obstructed after HEAD publication");
+                            }
+                        });
         var failure = assertThrows(IOException.class, () -> failing.checkout(root, "feature"));
         assertTrue(failure.getMessage().contains("rollback incomplete"));
         assertArrayEquals(oldHead, Files.readAllBytes(repo.headFile()));

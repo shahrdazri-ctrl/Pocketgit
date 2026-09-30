@@ -3,6 +3,7 @@ package com.pocketgit.storage;
 import com.pocketgit.repository.InvalidRepositoryException;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.util.HashUtils;
+
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -25,7 +26,10 @@ final class ObjectPaths {
 
     Path pathForHash(String hash) {
         validateHash(hash);
-        return repository.objectsDirectory().resolve(hash.substring(0, 2)).resolve(hash.substring(2));
+        return repository
+                .objectsDirectory()
+                .resolve(hash.substring(0, 2))
+                .resolve(hash.substring(2));
     }
 
     void checkBase() throws IOException {
@@ -33,11 +37,19 @@ final class ObjectPaths {
         requireDirectory(repository.objectsDirectory());
     }
 
+    Path temporaryDirectory() throws IOException {
+        checkBase();
+        return repository.objectsDirectory();
+    }
+
     void preparePrefix(String hash) throws IOException {
         checkBase();
         Path prefix = pathForHash(hash).getParent();
-        try { Files.createDirectory(prefix); }
-        catch (FileAlreadyExistsException existing) { /* Validate the existing prefix below. */ }
+        try {
+            Files.createDirectory(prefix);
+        } catch (FileAlreadyExistsException existing) {
+            /* Validate the existing prefix below. */
+        }
         requireDirectory(prefix);
     }
 
@@ -47,9 +59,11 @@ final class ObjectPaths {
     }
 
     private void requireDirectory(Path path) throws IOException {
-        var attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        var attributes =
+                Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         if (!attributes.isDirectory() || attributes.isSymbolicLink()) {
-            throw new InvalidRepositoryException("object storage requires a real directory: " + path);
+            throw new InvalidRepositoryException(
+                    "object storage requires a real directory: " + path);
         }
     }
 }

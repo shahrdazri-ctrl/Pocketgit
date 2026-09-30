@@ -54,7 +54,7 @@ public final class LogService {
         String hash = head.resolve(refs);
         var objects = new ObjectStore(repository);
         var codec = new ObjectCodec();
-        var entries = traverse(hash, id -> codec.decodeCommit(objects.read(id)));
+        var entries = traverse(hash, id -> codec.decodeCommit(objects.readCommit(id)));
         if (!head.equals(heads.read()) || !Objects.equals(hash, head.resolve(refs))) {
             throw new IOException("HEAD changed during history traversal; retry");
         }
@@ -64,7 +64,7 @@ public final class LogService {
     public Entry show(Path cwd, String prefix) throws IOException {
         var objects = new ObjectStore(locate(cwd));
         String hash = objects.resolve(prefix);
-        return new Entry(hash, new ObjectCodec().decodeCommit(objects.read(hash)));
+        return new Entry(hash, new ObjectCodec().decodeCommit(objects.readCommit(hash)));
     }
 
     /** Parents are visited in stored order, depth first; shared ancestors are emitted only once. */
