@@ -21,8 +21,9 @@ sh examples/demo.sh
 ```
 
 Spotless pins Google Java Format 1.24.0 with AOSP style over main, test, and GUI Java
-sources. The check runs during Maven validation. Use `.editorconfig` for UTF-8/LF and
-indentation, and keep `pom.xml` and YAML configuration readable.
+sources. The check runs during Maven validation. Git attributes normalize text to LF
+across platforms; `.editorconfig` defines UTF-8 and indentation. Keep `pom.xml` and
+YAML configuration readable.
 
 For focused behavior checks use `mvn -Dtest=ClassName test`. Full verification also
 runs core coverage, packaged Java processes, configured SpotBugs checks, and release

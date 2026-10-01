@@ -1,0 +1,6 @@
+# Keep source, scripts, and documentation consistent across native checkouts.
+* text=auto eol=lf
+
+# Preserve the exact recorded image bytes.
+*.gif binary
+*.png binary

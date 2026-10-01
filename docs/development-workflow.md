@@ -64,7 +64,8 @@ sh examples/demo.sh
 ```
 
 The pinned Spotless gate runs at `validate` over engine, test, and optional GUI Java
-sources. `.editorconfig` defines UTF-8/LF and editor indentation. Full verification
+sources. Git attributes normalize checked-out text to LF; `.editorconfig` defines
+UTF-8 and editor indentation. Full verification
 runs compilation, unit tests, core coverage, packaged-process integration tests,
 selected SpotBugs checks, and versioned release manifests.
 
