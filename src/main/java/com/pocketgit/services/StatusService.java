@@ -8,7 +8,6 @@ import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.repository.WorkingTree;
 import com.pocketgit.storage.IndexStore;
 import com.pocketgit.storage.ObjectStore;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;

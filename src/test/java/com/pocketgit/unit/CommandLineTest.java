@@ -1,5 +1,7 @@
 package com.pocketgit.unit;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.pocketgit.PocketGit;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -7,12 +9,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import static org.junit.jupiter.api.Assertions.*;
 
 class CommandLineTest {
     @TempDir Path temp;
 
     private record Result(int code, String out, String err) {}
+
     private Result execute(String... args) {
         var cli = PocketGit.commandLine(temp);
         var out = new StringWriter();
@@ -23,35 +25,61 @@ class CommandLineTest {
         return new Result(code, out.toString(), err.toString());
     }
 
-    @Test void helpAndNoArgumentsListAllPlannedCommandsWithoutSideEffects() {
-        for (String[] args : new String[][]{{}, {"--help"}}) {
+    @Test
+    void helpAndNoArgumentsListImplementedCommandsWithoutSideEffects() {
+        for (String[] args : new String[][] {{}, {"--help"}}) {
             Result result = execute(args);
             assertEquals(0, result.code());
-            for (String name : new String[]{"init", "status", "add", "commit", "log", "diff", "branch", "checkout", "restore"}) {
+            for (String name :
+                    new String[] {
+                        "init",
+                        "config",
+                        "status",
+                        "add",
+                        "commit",
+                        "log",
+                        "show",
+                        "cat-object",
+                        "diff",
+                        "branch",
+                        "checkout",
+                        "restore",
+                        "verify",
+                        "gui"
+                    }) {
                 assertTrue(result.out().contains(name));
             }
             assertFalse(Files.exists(temp.resolve(".pocketgit")));
         }
     }
 
-    @Test void guiHasHelpRepositoryErrorsAndOptionalBuildGuidance() {
-        assertEquals(0,execute("gui","--help").code());
+    @Test
+    void guiHasHelpRepositoryErrorsAndOptionalBuildGuidance() {
+        assertEquals(0, execute("gui", "--help").code());
         assertTrue(execute("gui").err().contains("not a PocketGit repository"));
         if (PocketGit.class.getResource("/com/pocketgit/gui/GuiLauncher.class") == null) {
-            execute("init"); var result=execute("gui");assertEquals(1,result.code());
-            assertTrue(result.err().contains("not included"));assertTrue(result.err().contains("-Pgui"));
+            execute("init");
+            var result = execute("gui");
+            assertEquals(1, result.code());
+            assertTrue(result.err().contains("not included"));
+            assertTrue(result.err().contains("-Pgui"));
             assertFalse(result.err().contains("\tat "));
         }
     }
 
-    @Test void versionIsCorrect() { assertEquals("PocketGit 1.0.0", execute("--version").out().strip()); }
+    @Test
+    void versionIsCorrect() {
+        assertEquals("PocketGit 1.0.0", execute("--version").out().strip());
+    }
 
-    @Test void initAndRepeatHaveDistinctHonestOutput() {
+    @Test
+    void initAndRepeatHaveDistinctHonestOutput() {
         assertTrue(execute("init").out().startsWith("Initialized empty PocketGit repository in "));
         assertTrue(execute("init").out().startsWith("PocketGit repository already exists at "));
     }
 
-    @Test void initResolvesOptionalDirectoryRelativeToWorkingDirectory() throws Exception {
+    @Test
+    void initResolvesOptionalDirectoryRelativeToWorkingDirectory() throws Exception {
         Path target = Files.createDirectory(temp.resolve("project with spaces"));
         Result result = execute("init", "project with spaces");
         assertEquals(0, result.code());
@@ -59,21 +87,27 @@ class CommandLineTest {
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 
-    @Test void implementedCommandsHaveCleanErrorsOutsideARepository() {
-        for (String name : new String[]{"log", "diff", "branch"}) {
-            Result result=execute(name); assertEquals(1,result.code()); assertTrue(result.err().contains("not a PocketGit repository"));
+    @Test
+    void implementedCommandsHaveCleanErrorsOutsideARepository() {
+        for (String name : new String[] {"log", "diff", "branch"}) {
+            Result result = execute(name);
+            assertEquals(1, result.code());
+            assertTrue(result.err().contains("not a PocketGit repository"));
         }
-        assertEquals(2,execute("restore").code()); assertFalse(Files.exists(temp.resolve(".pocketgit")));
+        assertEquals(2, execute("restore").code());
+        assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 
-    @Test void invalidArgumentsReturnUsageErrorWithoutMutation() {
+    @Test
+    void invalidArgumentsReturnUsageErrorWithoutMutation() {
         assertEquals(2, execute("unknown").code());
         assertEquals(2, execute("init", "--unknown").code());
         assertEquals(2, execute("init", "one", "two").code());
         assertFalse(Files.exists(temp.resolve(".pocketgit")));
     }
 
-    @Test void ioFailuresAreCleanAndActionable() throws Exception {
+    @Test
+    void ioFailuresAreCleanAndActionable() throws Exception {
         Files.writeString(temp.resolve(".pocketgit"), "keep me");
         Result result = execute("init");
         assertEquals(1, result.code());
@@ -82,7 +116,8 @@ class CommandLineTest {
         assertEquals("keep me", Files.readString(temp.resolve(".pocketgit")));
     }
 
-    @Test void addHasHelpArgumentValidationAndCleanErrors() throws Exception {
+    @Test
+    void addHasHelpArgumentValidationAndCleanErrors() throws Exception {
         assertEquals(0, execute("add", "--help").code());
         assertEquals(2, execute("add").code());
         assertEquals(2, execute("add", "one", "two").code());

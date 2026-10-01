@@ -15,7 +15,6 @@ import com.pocketgit.storage.MetadataLock;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.storage.ReflogStore;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;

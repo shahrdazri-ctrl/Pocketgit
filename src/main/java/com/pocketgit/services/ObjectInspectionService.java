@@ -7,7 +7,6 @@ import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectReader;
 import com.pocketgit.storage.ObjectStore;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;

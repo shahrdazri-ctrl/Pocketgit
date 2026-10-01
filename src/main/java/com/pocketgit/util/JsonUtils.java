@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 
 public final class JsonUtils {
     private JsonUtils() {}
+
     public static DefaultPrettyPrinter prettyPrinter() {
         var printer = new DefaultPrettyPrinter();
         var indent = new DefaultIndenter("  ", "\n");

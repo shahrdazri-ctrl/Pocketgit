@@ -9,14 +9,12 @@ import com.pocketgit.repository.*;
 import com.pocketgit.services.*;
 import com.pocketgit.storage.*;
 import com.pocketgit.util.FileModeUtils;
-
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Clock;
 import java.util.*;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 
 class CheckoutServiceTest {
     @TempDir Path root;

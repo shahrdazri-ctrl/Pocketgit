@@ -2,19 +2,17 @@ package com.pocketgit.cli;
 
 import com.pocketgit.services.RestoreService;
 import com.pocketgit.util.TerminalText;
-
-import picocli.CommandLine.*;
-import picocli.CommandLine.Model.CommandSpec;
-
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
+import picocli.CommandLine.*;
+import picocli.CommandLine.Model.CommandSpec;
 
 @Command(
         name = "restore",
         mixinStandardHelpOptions = true,
         description =
                 "Replace a working file from the index or a commit; discards that file's unstaged"
-                    + " changes.")
+                        + " changes.")
 public final class RestoreCommand implements Callable<Integer> {
     private final Path cwd;
     private final RestoreService service;

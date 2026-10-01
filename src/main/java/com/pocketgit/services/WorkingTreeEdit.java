@@ -8,7 +8,6 @@ import com.pocketgit.storage.MetadataFiles;
 import com.pocketgit.storage.ObjectHasher;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.PathUtils;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;

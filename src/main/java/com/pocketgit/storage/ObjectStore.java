@@ -4,13 +4,12 @@ import com.pocketgit.model.Blob;
 import com.pocketgit.model.ObjectType;
 import com.pocketgit.model.StoredObject;
 import com.pocketgit.repository.Repository;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 
-/** Public object database facade for future staging, trees, and commits. */
+/** Object database facade for immutable publication, streaming validation, and typed reads. */
 public final class ObjectStore {
     public static final int DEFAULT_MAX_PAYLOAD_BYTES = 64 * 1024 * 1024;
     private final Repository repository;

@@ -3,12 +3,10 @@ package com.pocketgit.unit;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.pocketgit.repository.IgnoreMatcher;
-
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Random;
+import org.junit.jupiter.api.Test;
 
 class IgnoreMatcherTest {
     @Test

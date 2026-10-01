@@ -9,11 +9,13 @@ import java.util.Objects;
 public record TreeEntry(String name, ObjectType type, String objectHash, FileMode mode) {
     public TreeEntry {
         PathUtils.validateIndexPath(name);
-        if (name.contains("/")) throw new IllegalArgumentException("tree entry must be a single name");
+        if (name.contains("/"))
+            throw new IllegalArgumentException("tree entry must be a single name");
         HashUtils.validateSha256(objectHash);
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(mode, "mode");
-        if (type == ObjectType.COMMIT || (type == ObjectType.TREE) != (mode == FileMode.DIRECTORY)) {
+        if (type == ObjectType.COMMIT
+                || (type == ObjectType.TREE) != (mode == FileMode.DIRECTORY)) {
             throw new IllegalArgumentException("tree entry type and mode disagree");
         }
     }

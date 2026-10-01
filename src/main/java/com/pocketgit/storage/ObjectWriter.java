@@ -1,7 +1,6 @@
 package com.pocketgit.storage;
 
 import com.pocketgit.model.ObjectType;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.Channels;

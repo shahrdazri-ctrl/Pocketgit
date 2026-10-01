@@ -5,13 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.services.AddService;
 import com.pocketgit.services.DiffService;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class DiffServiceResourceTest {
     @TempDir Path root;

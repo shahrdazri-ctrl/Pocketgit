@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.pocketgit.diff.DiffEngine;
 import com.pocketgit.diff.TextProbe;
-
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
 
 class TextProbeTest {
     @Test

@@ -3,7 +3,6 @@ package com.pocketgit.storage;
 import com.pocketgit.repository.InvalidRepositoryException;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.util.HashUtils;
-
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;

@@ -9,7 +9,6 @@ import com.pocketgit.storage.IndexStore;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.FileModeUtils;
 import com.pocketgit.util.PathUtils;
-
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -46,8 +45,7 @@ public final class AddService {
                         .findRepositoryRoot(cwd)
                         .orElseThrow(() -> new IOException("not a PocketGit repository"));
         Repository repository = new Repository(root);
-        // The master prompt defines add . as the whole working-tree scope, including nested
-        // invocations.
+        // add . stages the entire repository, including invocations from nested directories.
         boolean all = requested.toString().equals(".");
         Path scopePath = PathUtils.safeWorkingPath(root, all ? root : cwd.resolve(requested));
         String scope = scopePath.equals(root) ? "" : PathUtils.relativePath(root, scopePath);

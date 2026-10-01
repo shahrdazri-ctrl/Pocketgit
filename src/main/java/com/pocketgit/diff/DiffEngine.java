@@ -3,7 +3,6 @@ package com.pocketgit.diff;
 import static com.pocketgit.diff.DiffLine.Type.*;
 
 import com.pocketgit.model.FileMode;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;

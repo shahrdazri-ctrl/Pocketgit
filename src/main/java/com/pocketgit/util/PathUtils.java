@@ -1,7 +1,6 @@
 package com.pocketgit.util;
 
 import com.pocketgit.repository.Repository;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;

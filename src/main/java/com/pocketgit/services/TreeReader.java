@@ -6,14 +6,13 @@ import com.pocketgit.model.ObjectType;
 import com.pocketgit.storage.CorruptObjectException;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Flattens and verifies a snapshot for commits now and status/checkout in later phases. */
+/** Flattens verified Tree graphs into bounded, portable snapshots for repository services. */
 public final class TreeReader {
     private final ObjectStore objects;
     private final ObjectCodec codec = new ObjectCodec();

@@ -3,7 +3,16 @@ package com.pocketgit.gui;
 import com.pocketgit.services.HistoryViewService;
 import com.pocketgit.services.HistoryViewService.History;
 import com.pocketgit.services.HistoryViewService.Node;
-
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
@@ -25,18 +34,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.function.Consumer;
-
 import javax.imageio.ImageIO;
 
 /** A read-only repository browser. All object reads run on one background worker. */

@@ -2,12 +2,10 @@ package com.pocketgit.cli;
 
 import com.pocketgit.util.TerminalText;
 import com.pocketgit.validation.IntegrityChecker;
-
-import picocli.CommandLine.*;
-import picocli.CommandLine.Model.CommandSpec;
-
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
+import picocli.CommandLine.*;
+import picocli.CommandLine.Model.CommandSpec;
 
 @Command(
         name = "verify",

@@ -7,12 +7,10 @@ import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.services.AddService;
 import com.pocketgit.services.RestoreService;
 import com.pocketgit.storage.IndexStore;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class RepositoryAliasTest {
     @TempDir Path temporary;

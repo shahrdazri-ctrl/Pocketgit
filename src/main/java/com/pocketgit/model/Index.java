@@ -1,7 +1,6 @@
 package com.pocketgit.model;
 
 import com.pocketgit.util.PathUtils;
-
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;

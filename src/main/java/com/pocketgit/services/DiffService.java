@@ -6,7 +6,6 @@ import com.pocketgit.repository.*;
 import com.pocketgit.storage.*;
 import com.pocketgit.util.FileModeUtils;
 import com.pocketgit.util.PathUtils;
-
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.nio.file.*;

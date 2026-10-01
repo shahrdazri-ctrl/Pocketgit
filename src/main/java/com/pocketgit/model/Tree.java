@@ -2,7 +2,6 @@ package com.pocketgit.model;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.pocketgit.util.PathUtils;
-
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;

@@ -2,7 +2,6 @@ package com.pocketgit.cli;
 
 import com.pocketgit.model.RepositoryStatus;
 import com.pocketgit.util.TerminalText;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

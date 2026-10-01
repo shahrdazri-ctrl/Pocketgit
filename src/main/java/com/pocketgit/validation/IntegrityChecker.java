@@ -6,7 +6,6 @@ import com.pocketgit.repository.*;
 import com.pocketgit.services.*;
 import com.pocketgit.storage.*;
 import com.pocketgit.util.PathUtils;
-
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;

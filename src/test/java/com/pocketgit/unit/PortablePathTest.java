@@ -12,14 +12,12 @@ import com.pocketgit.repository.Repository;
 import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.util.PathUtils;
 import com.pocketgit.validation.RefNameValidator;
-
+import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.nio.file.Path;
-import java.util.List;
 
 class PortablePathTest {
     @TempDir Path root;

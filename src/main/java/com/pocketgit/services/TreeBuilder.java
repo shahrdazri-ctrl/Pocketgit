@@ -8,7 +8,6 @@ import com.pocketgit.model.Tree;
 import com.pocketgit.model.TreeEntry;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.TreeMap;

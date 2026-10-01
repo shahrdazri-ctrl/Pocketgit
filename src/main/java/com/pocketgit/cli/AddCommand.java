@@ -2,14 +2,12 @@ package com.pocketgit.cli;
 
 import com.pocketgit.services.AddService;
 import com.pocketgit.util.TerminalText;
-
+import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
-
-import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
 @Command(
         name = "add",
@@ -24,7 +22,7 @@ public final class AddCommand implements Callable<Integer> {
             paramLabel = "PATH",
             description =
                     "File/directory relative to the current directory; '.' stages the entire"
-                        + " repository.")
+                            + " repository.")
     private Path path;
 
     @Spec private CommandSpec spec;

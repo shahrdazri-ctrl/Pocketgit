@@ -6,7 +6,6 @@ import com.pocketgit.refs.RefStore;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.*;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

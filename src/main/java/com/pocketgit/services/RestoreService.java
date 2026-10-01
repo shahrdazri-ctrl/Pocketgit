@@ -4,7 +4,6 @@ import com.pocketgit.model.*;
 import com.pocketgit.repository.*;
 import com.pocketgit.storage.*;
 import com.pocketgit.util.PathUtils;
-
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;

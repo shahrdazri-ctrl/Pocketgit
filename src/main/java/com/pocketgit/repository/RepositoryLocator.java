@@ -19,12 +19,15 @@ public final class RepositoryLocator {
             Path metadata = new Repository(current).metadataDirectory();
             BasicFileAttributes attributes;
             try {
-                attributes = Files.readAttributes(metadata, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                attributes =
+                        Files.readAttributes(
+                                metadata, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             } catch (NoSuchFileException absent) {
                 continue;
             }
             if (!attributes.isDirectory() || attributes.isSymbolicLink()) {
-                throw new InvalidRepositoryException("metadata must be a real directory: " + metadata);
+                throw new InvalidRepositoryException(
+                        "metadata must be a real directory: " + metadata);
             }
             return Optional.of(current);
         }

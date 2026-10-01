@@ -2,7 +2,6 @@ package com.pocketgit.storage;
 
 import com.pocketgit.model.ObjectType;
 import com.pocketgit.model.StoredObject;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

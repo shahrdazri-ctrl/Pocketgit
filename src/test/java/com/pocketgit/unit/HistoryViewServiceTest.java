@@ -1,5 +1,7 @@
 package com.pocketgit.unit;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.pocketgit.model.Blob;
 import com.pocketgit.model.Commit;
 import com.pocketgit.model.FileMode;
@@ -25,7 +27,6 @@ import java.util.TreeMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import static org.junit.jupiter.api.Assertions.*;
 
 class HistoryViewServiceTest {
     @TempDir Path root;
@@ -33,45 +34,64 @@ class HistoryViewServiceTest {
     private ObjectStore objects;
     private final HistoryViewService viewer = new HistoryViewService();
 
-    @BeforeEach void initialize() throws Exception {
+    @BeforeEach
+    void initialize() throws Exception {
         repository = new RepositoryInitializer().initialize(root).repository();
         objects = new ObjectStore(repository);
     }
 
     private IndexEntry file(String path, String text, FileMode mode) throws Exception {
-        return new IndexEntry(path, objects.writeBlob(new Blob(text.getBytes(java.nio.charset.StandardCharsets.UTF_8))), mode);
+        return new IndexEntry(
+                path,
+                objects.writeBlob(new Blob(text.getBytes(java.nio.charset.StandardCharsets.UTF_8))),
+                mode);
     }
 
-    private String commit(List<String> parents, List<IndexEntry> files, String message, long second) throws Exception {
+    private String commit(List<String> parents, List<IndexEntry> files, String message, long second)
+            throws Exception {
         String tree = new TreeBuilder(objects).build(new Index(1, files));
-        var commit = new Commit(tree, parents, "Jane 日本語", "jane@example.com", Instant.ofEpochSecond(second), message);
+        var commit =
+                new Commit(
+                        tree,
+                        parents,
+                        "Jane 日本語",
+                        "jane@example.com",
+                        Instant.ofEpochSecond(second),
+                        message);
         return objects.write(ObjectType.COMMIT, new ObjectCodec().encodeCommit(commit));
     }
 
-    private void branch(String name, String hash) throws Exception { new RefStore(repository).updateRef("refs/heads/" + name, hash); }
+    private void branch(String name, String hash) throws Exception {
+        new RefStore(repository).updateRef("refs/heads/" + name, hash);
+    }
 
     private Map<String, byte[]> state() throws Exception {
         var result = new TreeMap<String, byte[]>();
         try (var paths = Files.walk(root)) {
-            for (Path path : paths.filter(Files::isRegularFile).toList()) result.put(root.relativize(path).toString(), Files.readAllBytes(path));
+            for (Path path : paths.filter(Files::isRegularFile).toList())
+                result.put(root.relativize(path).toString(), Files.readAllBytes(path));
         }
         return result;
     }
 
-    @Test void unbornRepositoryAndNestedDiscoveryHaveReadOnlyEmptyHistory() throws Exception {
+    @Test
+    void unbornRepositoryAndNestedDiscoveryHaveReadOnlyEmptyHistory() throws Exception {
         Path nested = Files.createDirectories(root.resolve("folder with spaces/日本語"));
         var before = state();
         var history = viewer.load(nested);
         assertEquals(root.toRealPath(), history.repositoryRoot());
         assertEquals("main", history.currentBranch());
         assertNull(history.headHash());
-        assertEquals(List.of(new HistoryViewService.Branch("main", null, true)), history.branches());
+        assertEquals(
+                List.of(new HistoryViewService.Branch("main", null, true)), history.branches());
         assertTrue(history.commits().isEmpty());
         assertEquals(1, history.laneCount());
         assertUnchanged(before);
     }
 
-    @Test void graphLoadsEveryBranchDeduplicatesAncestorsAndOrdersParentsAfterChildrenDespiteClockSkew() throws Exception {
+    @Test
+    void graphLoadsEveryBranchDeduplicatesAncestorsAndOrdersParentsAfterChildrenDespiteClockSkew()
+            throws Exception {
         var files = List.of(file("readme", "base", FileMode.REGULAR_FILE));
         String base = commit(List.of(), files, "base", 200);
         String main = commit(List.of(base), files, "main", 100);
@@ -82,8 +102,12 @@ class HistoryViewServiceTest {
         Files.writeString(root.resolve("local-untracked"), "user work");
         var before = state();
         var history = viewer.load(root);
-        assertEquals(List.of("alias", "feature/login", "main"), history.branches().stream().map(HistoryViewService.Branch::name).toList());
-        assertEquals(List.of(feature, main, base), history.commits().stream().map(HistoryViewService.Node::hash).toList());
+        assertEquals(
+                List.of("alias", "feature/login", "main"),
+                history.branches().stream().map(HistoryViewService.Branch::name).toList());
+        assertEquals(
+                List.of(feature, main, base),
+                history.commits().stream().map(HistoryViewService.Node::hash).toList());
         var nodes = new HashMap<String, HistoryViewService.Node>();
         history.commits().forEach(node -> nodes.put(node.hash(), node));
         assertEquals(0, nodes.get(main).lane());
@@ -95,7 +119,8 @@ class HistoryViewServiceTest {
         assertUnchanged(before);
     }
 
-    @Test void detachedHeadIsIncludedEvenWhenNotReachableFromAnyBranch() throws Exception {
+    @Test
+    void detachedHeadIsIncludedEvenWhenNotReachableFromAnyBranch() throws Exception {
         String base = commit(List.of(), List.of(), "base", 1);
         String detached = commit(List.of(base), List.of(), "detached", 2);
         branch("main", base);
@@ -103,23 +128,54 @@ class HistoryViewServiceTest {
         var history = viewer.load(root);
         assertNull(history.currentBranch());
         assertEquals(detached, history.headHash());
-        assertEquals(List.of(detached, base), history.commits().stream().map(HistoryViewService.Node::hash).toList());
+        assertEquals(
+                List.of(detached, base),
+                history.commits().stream().map(HistoryViewService.Node::hash).toList());
         assertEquals(List.of("HEAD"), history.commits().getFirst().labels());
         assertFalse(history.branches().getFirst().current());
     }
 
-    @Test void commitDetailsReportAddedModifiedDeletedAndExecutableChangesInSortedOrder() throws Exception {
+    @Test
+    void commitDetailsReportAddedModifiedDeletedAndExecutableChangesInSortedOrder()
+            throws Exception {
         var common = file("same", "unchanged", FileMode.REGULAR_FILE);
         var executable = file("run", "echo yes", FileMode.REGULAR_FILE);
-        String base = commit(List.of(), List.of(common, executable, file("gone", "deleted", FileMode.REGULAR_FILE), file("edited", "old", FileMode.REGULAR_FILE)), "base", 1);
-        String next = commit(List.of(base), List.of(common, new IndexEntry("run", executable.blobHash(), FileMode.EXECUTABLE_FILE), file("edited", "new", FileMode.REGULAR_FILE), file("added/日本語", "new", FileMode.REGULAR_FILE)), "summary\n\nbody", 2);
+        String base =
+                commit(
+                        List.of(),
+                        List.of(
+                                common,
+                                executable,
+                                file("gone", "deleted", FileMode.REGULAR_FILE),
+                                file("edited", "old", FileMode.REGULAR_FILE)),
+                        "base",
+                        1);
+        String next =
+                commit(
+                        List.of(base),
+                        List.of(
+                                common,
+                                new IndexEntry(
+                                        "run", executable.blobHash(), FileMode.EXECUTABLE_FILE),
+                                file("edited", "new", FileMode.REGULAR_FILE),
+                                file("added/日本語", "new", FileMode.REGULAR_FILE)),
+                        "summary\n\nbody",
+                        2);
         branch("main", next);
         var before = state();
         var value = viewer.details(root, next.substring(0, 12));
         assertEquals(next, value.hash());
         assertEquals("summary\n\nbody", value.commit().message());
-        assertEquals(List.of("added/日本語", "edited", "gone", "run"), value.changedFiles().stream().map(HistoryViewService.ChangedFile::path).toList());
-        assertEquals(List.of(ChangeKind.ADDED, ChangeKind.MODIFIED, ChangeKind.DELETED, ChangeKind.MODIFIED), value.changedFiles().stream().map(HistoryViewService.ChangedFile::kind).toList());
+        assertEquals(
+                List.of("added/日本語", "edited", "gone", "run"),
+                value.changedFiles().stream().map(HistoryViewService.ChangedFile::path).toList());
+        assertEquals(
+                List.of(
+                        ChangeKind.ADDED,
+                        ChangeKind.MODIFIED,
+                        ChangeKind.DELETED,
+                        ChangeKind.MODIFIED),
+                value.changedFiles().stream().map(HistoryViewService.ChangedFile::kind).toList());
         assertNull(value.changedFiles().getFirst().beforeMode());
         assertEquals(FileMode.REGULAR_FILE, value.changedFiles().get(3).beforeMode());
         assertEquals(FileMode.EXECUTABLE_FILE, value.changedFiles().get(3).afterMode());
@@ -127,20 +183,26 @@ class HistoryViewServiceTest {
         assertUnchanged(before);
     }
 
-    @Test void rootCommitAddsAllFilesAndMergeDetailsCompareOnlyFirstParent() throws Exception {
+    @Test
+    void rootCommitAddsAllFilesAndMergeDetailsCompareOnlyFirstParent() throws Exception {
         var file = file("hello", "hello", FileMode.REGULAR_FILE);
         String base = commit(List.of(), List.of(file), "base", 1);
         String other = commit(List.of(base), List.of(), "other", 2);
         String merge = commit(List.of(base, other), List.of(file), "merge", 3);
         branch("main", merge);
         var first = viewer.details(root, base);
-        assertEquals(List.of(ChangeKind.ADDED), first.changedFiles().stream().map(HistoryViewService.ChangedFile::kind).toList());
+        assertEquals(
+                List.of(ChangeKind.ADDED),
+                first.changedFiles().stream().map(HistoryViewService.ChangedFile::kind).toList());
         assertTrue(viewer.details(root, merge).changedFiles().isEmpty());
         var history = viewer.load(root);
-        assertEquals(List.of(merge, other, base), history.commits().stream().map(HistoryViewService.Node::hash).toList());
+        assertEquals(
+                List.of(merge, other, base),
+                history.commits().stream().map(HistoryViewService.Node::hash).toList());
     }
 
-    @Test void corruptedHistoryAndMissingSnapshotsFailBeforeReturningMisleadingData() throws Exception {
+    @Test
+    void corruptedHistoryAndMissingSnapshotsFailBeforeReturningMisleadingData() throws Exception {
         var entry = file("hello", "hello", FileMode.REGULAR_FILE);
         String base = commit(List.of(), List.of(entry), "base", 1);
         String next = commit(List.of(base), List.of(entry), "next", 2);
@@ -152,12 +214,17 @@ class HistoryViewServiceTest {
         assertThrows(IOException.class, () -> viewer.details(root, "abcdefabcdef"));
     }
 
-    @Test void missingRepositoryAndMalformedHeadFailClearly() throws Exception {
+    @Test
+    void missingRepositoryAndMalformedHeadFailClearly() throws Exception {
         Path outside = Files.createTempDirectory("pocketgit-viewer-outside");
         try {
-            assertEquals("not a PocketGit repository", assertThrows(IOException.class, () -> viewer.load(outside)).getMessage());
+            assertEquals(
+                    "not a PocketGit repository",
+                    assertThrows(IOException.class, () -> viewer.load(outside)).getMessage());
             assertThrows(IOException.class, () -> viewer.details(outside, "a".repeat(64)));
-        } finally { Files.delete(outside); }
+        } finally {
+            Files.delete(outside);
+        }
         Files.writeString(repository.headFile(), "bad head\n");
         assertThrows(IOException.class, () -> viewer.load(root));
     }

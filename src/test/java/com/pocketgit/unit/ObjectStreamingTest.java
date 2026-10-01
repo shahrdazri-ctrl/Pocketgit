@@ -6,11 +6,6 @@ import com.pocketgit.model.ObjectType;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.storage.ObjectStore;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,6 +14,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ObjectStreamingTest {
     @TempDir Path root;

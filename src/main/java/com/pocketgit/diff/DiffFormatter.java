@@ -2,7 +2,6 @@ package com.pocketgit.diff;
 
 import com.pocketgit.model.FileMode;
 import com.pocketgit.util.TerminalText;
-
 import java.io.IOException;
 import java.util.List;
 

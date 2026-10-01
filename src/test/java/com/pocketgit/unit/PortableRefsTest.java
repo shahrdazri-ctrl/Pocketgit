@@ -14,13 +14,6 @@ import com.pocketgit.services.CheckoutService;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.validation.IntegrityChecker;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +21,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class PortableRefsTest {
     @TempDir Path root;

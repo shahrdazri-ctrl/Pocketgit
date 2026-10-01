@@ -11,12 +11,10 @@ import com.pocketgit.model.FileMode;
 import com.pocketgit.model.RepositoryStatus;
 import com.pocketgit.services.LogService;
 import com.pocketgit.util.TerminalText;
-
-import org.junit.jupiter.api.Test;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
 class TerminalOutputTest {
     @Test

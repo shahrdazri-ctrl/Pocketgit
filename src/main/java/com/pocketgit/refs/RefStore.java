@@ -9,7 +9,6 @@ import com.pocketgit.storage.ObjectStore;
 import com.pocketgit.util.HashUtils;
 import com.pocketgit.util.PathUtils;
 import com.pocketgit.validation.RefNameValidator;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;

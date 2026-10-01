@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.pocketgit.diff.DiffEngine;
 import com.pocketgit.model.FileMode;
-
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
 
 class DiffResourceLimitTest {
     private final DiffEngine engine = new DiffEngine();

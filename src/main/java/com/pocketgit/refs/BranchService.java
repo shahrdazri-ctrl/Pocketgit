@@ -4,7 +4,6 @@ import com.pocketgit.repository.Repository;
 import com.pocketgit.repository.RepositoryLocator;
 import com.pocketgit.storage.MetadataFiles;
 import com.pocketgit.storage.MetadataLock;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.text.Normalizer;

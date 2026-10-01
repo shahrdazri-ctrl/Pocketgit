@@ -6,7 +6,6 @@ import com.pocketgit.refs.RefStore;
 import com.pocketgit.repository.Repository;
 import com.pocketgit.storage.ObjectCodec;
 import com.pocketgit.storage.ObjectStore;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;

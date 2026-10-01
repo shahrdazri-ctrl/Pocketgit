@@ -6,17 +6,15 @@ import com.pocketgit.PocketGit;
 import com.pocketgit.model.ObjectType;
 import com.pocketgit.repository.RepositoryInitializer;
 import com.pocketgit.storage.ObjectStore;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CatObjectCommandTest {
     @TempDir Path temp;

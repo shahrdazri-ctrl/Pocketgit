@@ -1,17 +1,15 @@
 package com.pocketgit.cli;
 
 import com.pocketgit.services.ObjectInspectionService;
-
+import java.io.OutputStream;
+import java.nio.file.Path;
+import java.util.concurrent.Callable;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
-
-import java.io.OutputStream;
-import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
 @Command(
         name = "cat-object",

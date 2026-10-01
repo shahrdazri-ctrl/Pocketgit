@@ -27,14 +27,12 @@ import com.pocketgit.services.RestoreService;
 import com.pocketgit.services.StatusService;
 import com.pocketgit.util.TerminalText;
 import com.pocketgit.validation.IntegrityChecker;
-
-import picocli.CommandLine;
-
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import picocli.CommandLine;
 
 public final class PocketGit {
     private PocketGit() {}
