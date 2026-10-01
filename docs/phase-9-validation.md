@@ -1,5 +1,7 @@
 # Phase 9 validation
 
+> Historical implementation record. Current behavior is documented in the [documentation index](README.md); current release checks are in [validation](validation.md).
+
 Linux, Java 21/Maven 3.9.11: `mvn clean verify` passed **342 unit tests and 22 packaged integration tests**, with zero failures/errors/skips. JaCoCo reported **96.61% core line coverage (1,398/1,447 lines)**, above the enforced 80% minimum. CLI/bootstrap code is outside that core gate and covered by CLI and packaged workflows.
 
 Failure injection covers missing Blobs/Trees/parents, truncated Commits, malformed index/HEAD/refs, object filename/hash mismatches, illegal storage names, unreachable corrupt objects, wrong-type index targets, locks, unwritable metadata, and symlinks. Checks compare before/after bytes to confirm verification does not repair files. Six seeded snapshot runs restored 25 mixed binary files each through checkout and restore.

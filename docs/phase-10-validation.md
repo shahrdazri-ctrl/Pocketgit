@@ -1,5 +1,7 @@
 # Phase 10 validation
 
+> Historical implementation record. Current behavior is documented in the [documentation index](README.md); current release checks are in [validation](validation.md).
+
 Both release profiles passed locally on Linux with Java 21 and Maven 3.9.11. Configured cross-platform CI is not evidence of completed Windows/macOS runs.
 
 ## Observed CLI and engine checks

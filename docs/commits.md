@@ -1,4 +1,4 @@
-# Trees and commits — Phase 4
+# Trees and commits
 
 `commit -m MESSAGE` creates a snapshot of the index on the current attached branch. Working files are not read or rewritten, and the index is retained. A staged deletion removes the path from the new snapshot; file/directory transitions and executable modes are preserved. Untracked or unstaged changes are excluded. Discovery works from nested directories.
 
@@ -25,7 +25,7 @@ Settings are repository-local UTF-8 JSON in `.pocketgit/config`:
 }
 ```
 
-New repositories start with an empty `user` object. Missing settings are represented by absent or null fields; repositories from earlier phases may lack the file. Setting either key preserves the other. Config rejects unknown keys/fields, duplicate JSON keys, trailing values, and non-string values (except null). Reads are capped at 1 MiB. Updates hold `config.lock`, force a prepared file, and replace atomically with LF formatting. Missing or corrupt settings are never silently overwritten with defaults.
+New repositories start with an empty `user` object. Missing settings are represented by absent or null fields; older repositories may lack the file. Setting either key preserves the other. Config rejects unknown keys/fields, duplicate JSON keys, trailing values, and non-string values (except null). Reads are capped at 1 MiB. Updates hold `config.lock`, force a prepared file, and replace atomically with LF formatting. Missing or corrupt settings are never silently overwritten with defaults.
 
 Each non-null `POCKETGIT_AUTHOR_NAME`/`POCKETGIT_AUTHOR_EMAIL` overrides its corresponding local setting. Blank environment values are errors. Identity is stripped of surrounding whitespace and must be nonblank and contain no control characters. Email requires an interior `@` and no whitespace; this is a basic validation, not full RFC mailbox parsing. No identity is fabricated. Invalid/missing identity blocks a new commit and explains the config commands. Malformed config remains an error even with environment overrides.
 
@@ -65,7 +65,7 @@ Snapshot construction/traversal permits at most 256 path components and 100,000 
 
 ## Ref and reflog publication
 
-HEAD must name an existing branch as `ref: refs/heads/NAME` with an optional final LF; detached HEAD is unsupported in this phase. Branch names reject traversal, reserved HEAD, dot components, `.lock` suffixes, backslashes, colons, controls/whitespace, and Git-style unsafe punctuation. Existing branch refs are either exactly empty (unborn) or a full Commit ID with an optional final LF. Missing refs, malformed IDs, symlinks, and nonregular metadata are errors; commit does not recreate missing refs. Branch creation and switching belong to later phases.
+HEAD must name an existing branch as `ref: refs/heads/NAME` with an optional final LF; commit creation requires an attached branch. Branch names reject traversal, reserved HEAD, dot components, `.lock` suffixes, backslashes, colons, controls/whitespace, and Git-style unsafe punctuation. Existing branch refs are either exactly empty (unborn) or a full Commit ID with an optional final LF. Missing refs, malformed IDs, symlinks, and nonregular metadata are errors; commit does not recreate missing refs. See [history and branches](history-and-branches.md) and [checkout](checkout.md) for reference operations.
 
 A commit holds `index.lock` then `commit.lock` throughout reading and publication. It verifies the old commit and snapshot before comparison, requires identity for a new commit, writes Trees and Commit, then verifies the new Commit's complete snapshot and immediate parent objects. It prepares both a ref replacement and the full next reflog before publishing either. HEAD and the old ref are rechecked immediately before publication. Ref publication occurs first, followed by the log. Prepared files are forced before atomic rename; no non-atomic fallback is allowed. Reads/writes reject symlinks observed in metadata paths.
 
@@ -75,7 +75,7 @@ Each LF-terminated reflog line has this form:
 <old ID or 64 zeroes> <new ID> <Instant timestamp> commit
 ```
 
-The reflog is capped at 8 MiB. Invalid UTF-8 or a truncated final line blocks a commit before ref movement. Full validation of earlier log records and complete historical integrity checking belong to Phase 9.
+The reflog is capped at 8 MiB. Invalid UTF-8 or a truncated final line blocks a commit before ref movement. The [integrity checker](integrity.md) validates object graphs and references; historic reflog record semantics remain outside its scope.
 
 Errors before ref publication preserve the old ref and log; newly written, unreachable objects may remain for later collection. Index and working files stay unchanged. Ref and log replacements are individually atomic, **not a combined transaction**. A crash or log-write failure after ref publication can leave a valid published commit without its reflog entry. A reported post-publication I/O failure includes the published commit ID and tells the user to inspect the branch/log before retrying. There is no automatic rollback of a valid published commit.
 

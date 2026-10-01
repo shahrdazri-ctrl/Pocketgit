@@ -44,9 +44,9 @@ java -Dpocketgit.gui.smoke=true \
   -jar /absolute/path/pocketgit-gui-1.0.0.jar gui
 ```
 
-Run this from a committed temporary repository with a desktop/virtual display. The optional screenshot is captured from the actual JavaFX scene. A successful normal CLI build establishes engine behavior, not display availability; [phase validation](phase-10-validation.md) records separately which GUI checks actually ran.
+Run this from a committed temporary repository with a desktop/virtual display. The optional screenshot is captured from the actual JavaFX scene. A successful normal CLI build establishes engine behavior, not display availability; [validation evidence](validation.md) separates build results from actual scene checks.
 
-CI also exercises the scene offscreen with checksum-pinned TestFX Monocle 21.0.2 and software rendering. Monocle is validation tooling; it is not included in either release JAR. In this restricted cloud workspace, `-Djavafx.cachedir=/workspace/.cache/javafx` and `XDG_CACHE_HOME=/workspace/.cache` provide writable native-library and font caches without changing the user home directory.
+CI also exercises the scene offscreen with checksum-pinned TestFX Monocle 21.0.2 and software rendering. Monocle is validation tooling; it is not included in either release JAR. On restricted systems, choose writable native-library and font-cache directories with `-Djavafx.cachedir=PATH` and `XDG_CACHE_HOME=PATH`. The CI scene step provides a complete example.
 
 ## Large histories and snapshots
 

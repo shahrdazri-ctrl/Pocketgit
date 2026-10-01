@@ -1,6 +1,6 @@
-# Safe checkout (Phase 7)
+# Safe checkout
 
-`pocketgit checkout BRANCH` switches to an existing branch, restores its verified snapshot, and updates the index, symbolic HEAD, and HEAD reflog. Checkout of the attached branch reports `Already on 'BRANCH'` without rewriting files. Branch names and metadata paths retain Phase 6 validation. Detached checkout is not exposed.
+`pocketgit checkout BRANCH` switches to an existing branch, restores its verified snapshot, and updates the index, symbolic HEAD, and HEAD reflog. Checkout of the attached branch reports `Already on 'BRANCH'` without rewriting files. Branch names and metadata paths follow the [reference validation rules](history-and-branches.md). Detached checkout is not exposed.
 
 `CheckoutPlanner` computes all writes, removals, and conflicts before mutation. Staged changes block switching: commit them first. Unstaged changes to affected tracked files, missing affected tracked files, conflicting untracked/ignored files, symlinks, and obstructions in ancestor or descendant paths block switching. Unrelated unstaged files and untracked files survive. Tracked file/directory transitions are supported only when they do not consume unrelated files or empty directories. There is no force option.
 

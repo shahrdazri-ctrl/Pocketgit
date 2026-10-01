@@ -1,8 +1,8 @@
-# History, references, and branches (Phase 6)
+# History, references, and branches
 
 `pocketgit log` starts at HEAD and prints full IDs, authors, UTC timestamps, and indented multiline messages, newest commit first along ordinary single-parent history. `log --oneline` prints seven-character IDs and the first message line. An unborn HEAD prints `No commits yet.` and exits successfully.
 
-Traversal is iterative, follows parents in stored order depth first, emits shared ancestors once, and detects cycles using an active-path set. All visited objects are hash-verified and semantically decoded as canonical Commits before any log output is printed. Missing, malformed, corrupt, and wrong-type parents fail with a clean error. Traversal is bounded at 100,000 distinct commits. The current commit creator has one parent; the traversal supports multiple parents but does not promise a date-sorted or topological merge graph. Trees and Blobs are not traversed by log; whole-repository verification belongs to Phase 9.
+Traversal is iterative, follows parents in stored order depth first, emits shared ancestors once, and detects cycles using an active-path set. All visited objects are hash-verified and semantically decoded as canonical Commits before any log output is printed. Missing, malformed, corrupt, and wrong-type parents fail with a clean error. Traversal is bounded at 100,000 distinct commits. The current commit creator has one parent; the traversal supports multiple parents but does not promise a date-sorted or topological merge graph. Trees and Blobs are inspected by the separate [whole-repository verification](integrity.md) operation.
 
 `pocketgit show COMMIT` resolves a full ID or unique lowercase hexadecimal prefix (1–64 characters) and prints the full commit ID, Tree ID, all parent IDs, author, UTC timestamp, and message. It verifies and decodes the selected Commit; it does not traverse its ancestors or produce a diff. Prefix matching includes all object types, so two matching objects are ambiguous even if only one is a Commit. No match, ambiguity, invalid spelling, a non-Commit, and corrupt selected bytes are errors. Symlinked object directories and selected object paths are rejected. Object envelopes and hashing are unchanged. `cat-object` continues to require full IDs.
 
@@ -18,7 +18,7 @@ HEAD accepts either `ref: refs/heads/NAME` or a full lowercase Commit ID, with a
 
 Branch creation also holds `commit.lock`, sharing serialization with commits and ref updates. Complete ref bytes (`64-character ID + LF`) are forced to a private temporary file. New branches publish through an exclusive hard link; existing updates use atomic replacement. A concurrent destination is never overwritten by creation. Ref directories may remain empty if an operation fails after creating them. No multi-file transaction or directory fsync durability is promised; abrupt termination can leave lock or temporary files. Inspect active operations and repository state before manual cleanup. Metadata safety assumes another process does not maliciously rename directories during access, as in the existing object store.
 
-Branch switching is documented in [checkout](checkout.md). Diff and restore belong to Phase 8.
+See [checkout](checkout.md) for branch switching and [diff/restore](diff-and-restore.md) for content comparison and restoration.
 
 Shared-history readers used by verification and the viewer validate all roots in one bounded iterative traversal. Each distinct Commit is read once across the entire forest. A stack frame advances one parent at a time, avoiding an unbounded queue of pending siblings while retaining stored parent order and active-path cycle detection. Snapshot scans verify repeated Blob IDs once per scan; verification is never cached across separate calls.
 

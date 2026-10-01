@@ -12,7 +12,7 @@ Use strict version-1 JSON for the index with repository-relative `/` paths. Sort
 
 ## Consequences
 
-Filesystem walk order never affects a Tree ID. Unknown versions/fields, duplicate keys/paths, path escapes, and noncanonical objects fail clearly. JSON helps inspection at the cost of larger payloads than a custom binary representation. Filename legality and case behavior still depend on the destination platform.
+Filesystem walk order never affects a Tree ID. Unknown versions/fields, duplicate keys/paths, path escapes, and noncanonical objects fail clearly. JSON helps inspection at the cost of larger payloads than a custom binary representation. Portable-name validation rejects device names and case/Unicode aliases before publication. Filesystem path-length limits and additional platform restrictions still apply.
 
 ## Alternatives
 

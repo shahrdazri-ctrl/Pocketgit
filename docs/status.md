@@ -1,4 +1,4 @@
-# Status — Phase 5
+# Status
 
 ```bash
 pocketgit status
@@ -54,10 +54,10 @@ Metadata components named `.pocketgit`, case-insensitively, are always excluded 
 
 ## Integrity, read-only behavior, and concurrent changes
 
-Status verifies the current Commit, Trees, their Blobs, and each unique indexed Blob. Missing, corrupt, or mistyped objects and malformed HEAD/ref/index/ignore data are errors instead of a false clean result. The HEAD flattening API is `HeadSnapshotReader.read(Repository)`, returning branch, optional commit ID, and an immutable `Index` of files/modes. Existing branch refs must be present even when unborn. Detached HEAD remains unsupported until the reference/history phase.
+Status verifies the current Commit, Trees, their Blobs, and each unique indexed Blob. Missing, corrupt, or mistyped objects and malformed HEAD/ref/index/ignore data are errors instead of a false clean result. The HEAD flattening API is `HeadSnapshotReader.read(Repository)`, returning branch, optional commit ID, and an immutable `Index` of files/modes. Existing branch refs must be present even when unborn. Status requires HEAD to be attached to a branch; history and object inspection can read a detached HEAD.
 
-Status does not read author configuration or reflog contents, and it is not a full repository integrity audit. Corrupt configuration/reflog data does not prevent unrelated status inspection; unreachable objects, other branches, and older parent history are left to later verification work.
+Status does not read author configuration or reflog contents, and it is not a full repository integrity audit. Corrupt configuration/reflog data does not prevent unrelated status inspection; use `pocketgit verify` to inspect unreachable objects, other branches, and older parent history.
 
 The command leaves file contents, objects, index, refs, HEAD, configuration, and reflog unchanged. It creates no lock or temporary files and can read complete atomic metadata snapshots while another operation holds a marker lock. Filesystem access-time bookkeeping may occur during reads.
 
-Working fingerprints compare size, modification time, file identity, type, and mode around the read and reject observed in-flight changes; streamed byte counts must match the declared length. After inspection, status reloads the index and rechecks HEAD/ref, rejecting observed movement with a retry error. It does not lock the working tree or provide a simultaneous filesystem transaction: edits after a path was inspected, metadata ABA changes, or malicious renaming can escape these checks. Checkout must revalidate its plan immediately before any later writes. Snapshot formats and publication rules are unchanged by Phase 5.
+Working fingerprints compare size, modification time, file identity, type, and mode around the read and reject observed in-flight changes; streamed byte counts must match the declared length. After inspection, status reloads the index and rechecks HEAD/ref, rejecting observed movement with a retry error. It does not lock the working tree or provide a simultaneous filesystem transaction: edits after a path was inspected, metadata ABA changes, or malicious renaming can escape these checks. Checkout revalidates its plan immediately before later writes.

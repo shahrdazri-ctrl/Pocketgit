@@ -1,5 +1,7 @@
 # Phase 6 validation
 
+> Historical implementation record. Current behavior is documented in the [documentation index](README.md); current release checks are in [validation](validation.md).
+
 Validated on Linux with OpenJDK 21.0.12.1 and Maven 3.9.11.
 
 ```bash

@@ -2,159 +2,412 @@
 
 [![Build and test](https://github.com/shahrdazri-ctrl/Pocketgit/actions/workflows/ci.yml/badge.svg)](https://github.com/shahrdazri-ctrl/Pocketgit/actions/workflows/ci.yml)
 
-PocketGit is a Git-inspired version-control engine written from scratch in Java 21. It implements immutable content-addressable storage, SHA-256 object IDs, staging, commit trees, branches, safe checkout, history traversal, unified diffs, restoration, and integrity verification without invoking Git or using JGit.
+**A version-control engine built from first principles in Java 21.**
 
-![A real PocketGit terminal workflow](docs/screenshots/demo.gif)
+PocketGit implements content-addressable storage, deterministic snapshots, a staging
+index, parent-linked commit history, safe branch switching, unified diffs, byte-exact
+restoration, and repository verification. Its engine owns these operations: SHA-256,
+zlib, filesystem publication, graph traversal, and diff computation run in Java.
+Picocli handles command parsing; Jackson handles structured metadata.
 
-The [recording](docs/screenshots/demo.cast) comes from the executable [demo script](examples/demo.sh), using the packaged CLI in a fresh temporary repository. It demonstrates the complete snapshot → branch → checkout → restore workflow.
+Designed and maintained by [**shahrdazri-ctrl**](https://github.com/shahrdazri-ctrl).
 
-## Features
+[Get started](#get-started) · [Architecture](#architecture) ·
+[Storage](#storage-and-integrity) · [Safety](#working-tree-safety) ·
+[Verification](#verification-and-quality) · [Documentation](docs/README.md)
 
-- Byte-exact text and binary snapshots up to 64 MiB per file, streamed into immutable compressed objects and deterministic Trees.
-- Independent HEAD, staging index, and working-tree comparisons; scoped staging and root ignore rules.
-- Author configuration, parent-linked commits, branch creation/listing, history, and commit inspection.
-- Branch checkout with staged-work, local-edit, untracked-file, and path-obstruction protection.
-- Unified text diffs with three context lines; binary and executable-mode change reporting.
-- Single-file restore from the index or a historical commit, plus whole-object and graph verification.
-- [Optional JavaFX history viewer](docs/gui.md), separate from the self-contained CLI.
+![PocketGit terminal workflow: snapshots, branches, checkout, diff, restore, and verification](docs/screenshots/demo.gif)
 
-PocketGit repositories use `.pocketgit/`, their own formats, and SHA-256 IDs. They are separate from Git repositories; PocketGit does not read `.git/` or implement Git's protocols.
+The recording executes the [demo script](examples/demo.sh) against a packaged JAR in
+a fresh repository. The [source recording](docs/screenshots/demo.cast) is available
+for replay and inspection.
 
-## Install and run
+## Project scope
 
-Requirements: **JDK 21+**; building from source also requires **Maven 3.9+**. Linux, macOS, and Windows are supported by the build and launchers. The filesystem must support hard links and atomic file replacement.
+PocketGit is a local version-control system with its own `.pocketgit/` repository
+format. It exposes the familiar separation between committed state, staged state,
+and working files, while keeping storage and mutation rules small enough to inspect
+and test independently. It does not invoke Git or JGit, read Git repositories, or
+implement Git's transport protocols.
+
+The project concentrates on the difficult boundaries of a filesystem-backed engine:
+validating untrusted metadata, producing stable object IDs, preserving unrelated
+work during checkout, reporting partial publication accurately, and bounding resource
+usage. The [engineering specification](pocketgit.md), [architecture](docs/architecture.md),
+and [design decisions](docs/README.md#design-decisions) document those choices.
+
+| Engineering area | Implementation | Evidence |
+| --- | --- | --- |
+| Object integrity | Typed SHA-256 IDs; one validated zlib stream; exact payload lengths; canonical Tree/Commit JSON. | [Object storage regressions](src/test/java/com/pocketgit/unit/ObjectStoreTest.java), [format specification](docs/repository-format.md). |
+| Working-file safety | A complete conflict plan before mutation; revalidation; atomic replacements; private rollback preparation. | [Checkout regressions](src/test/java/com/pocketgit/unit/CheckoutServiceTest.java), [editor lifecycle tests](src/test/java/com/pocketgit/unit/WorkingTreeEditLifecycleTest.java). |
+| Resource control | Streaming Blob publication/inspection; bounded edit preparation, text inputs, LCS matrices, and command output. | [64 MiB low-heap workflow](src/test/java/com/pocketgit/integration/LargeFileIT.java), [diff limits](src/test/java/com/pocketgit/unit/DiffServiceResourceTest.java). |
+| Portable repository inputs | Validated paths and branch namespaces; case/normalization collision checks; Unicode-aware ignore matching. | [Portable reference tests](src/test/java/com/pocketgit/unit/PortableRefsTest.java), [independent ignore oracle](src/test/java/com/pocketgit/unit/IgnoreMatcherTest.java). |
+| History processing | Bounded iterative traversal; cycle detection; shared ancestors read once across multiple roots. | [Shared-history tests](src/test/java/com/pocketgit/unit/HistoryForestTest.java), [history readers](src/main/java/com/pocketgit/services/LogService.java). |
+| Distribution | Self-contained CLI JAR; optional platform-specific JavaFX artifact; versioned files and SHA-256 manifests. | [Release guide](docs/release.md), [CI workflow](.github/workflows/ci.yml). |
+
+## Get started
+
+### Build the CLI
+
+Requirements are **JDK 21+** and **Maven 3.9+**. Storage requires a filesystem that
+supports hard links and atomic file replacement. Linux, macOS, and Windows have
+launchers and configured native CI jobs.
 
 ```bash
+git clone https://github.com/shahrdazri-ctrl/Pocketgit.git
+cd Pocketgit
 mvn clean verify
-java -jar target/pocketgit.jar --help
 java -jar target/pocketgit.jar --version
+java -jar target/pocketgit.jar --help
 ```
 
-The executable JAR contains the CLI dependencies. Copy it to another directory and run `java -jar /path/to/pocketgit.jar ...`, or add this checkout's `bin/` to your PATH after building:
+`verify` checks formatting, compiles the project, runs unit tests and packaged-process
+integration tests, enforces core coverage, checks selected SpotBugs findings, and
+produces release checksums. The CLI JAR includes its runtime dependencies; a separate
+JavaFX installation is unnecessary for CLI use.
+
+The resulting distribution files are:
+
+```text
+target/pocketgit.jar
+target/pocketgit-1.0.0.jar
+target/pocketgit-1.0.0.jar.sha256
+```
+
+Copy the versioned JAR and checksum together when distributing a build. To verify
+on Linux, run `sha256sum -c pocketgit-1.0.0.jar.sha256` from `target/`; on macOS use
+`shasum -a 256 -c pocketgit-1.0.0.jar.sha256`. PowerShell users can compare
+`Get-FileHash -Algorithm SHA256` with the manifest. See [release and distribution](docs/release.md)
+for packaging details and reproducibility checks.
+
+### Use the launchers
+
+From the source checkout on Linux or macOS:
 
 ```bash
 export PATH="$PWD/bin:$PATH"
 pocketgit --help
 ```
 
-On Windows, add the absolute `bin` directory to PATH and use `pocketgit.cmd`. Both launchers preserve the caller's working directory and honor `JAVA_HOME`. See [release and distribution](docs/release.md) for versioned artifacts, checksums, and the optional viewer.
+On Windows, add the absolute `bin` directory to `PATH` and use `pocketgit.cmd`.
+Both launchers honor `JAVA_HOME` and preserve the caller's working directory.
+Alternatively, invoke `java -jar /absolute/path/pocketgit-1.0.0.jar COMMAND` anywhere.
 
-## Quick start
+### Run a complete repository workflow
+
+Use a new working directory. PocketGit excludes its own `.pocketgit/` metadata;
+`.git/` is not implicitly ignored when staging another tool's checkout.
 
 ```bash
-mkdir demo
-cd demo
+mkdir pocketgit-example
+cd pocketgit-example
 pocketgit init
 pocketgit config user.name "Jane Developer"
 pocketgit config user.email "jane@example.com"
 
 printf 'hello\n' > hello.txt
 pocketgit add .
-pocketgit commit -m "Initial commit"
+pocketgit commit -m "Initial snapshot"
 
 printf 'world\n' >> hello.txt
 pocketgit status
 pocketgit diff
 pocketgit add .
 pocketgit diff --staged
-pocketgit commit -m "Update hello"
+pocketgit commit -m "Extend greeting"
 
 pocketgit branch experiment
 pocketgit checkout experiment
 printf 'branch work\n' > experiment.txt
 pocketgit add .
-pocketgit commit -m "Experiment"
+pocketgit commit -m "Add experiment"
 
 pocketgit checkout main
 pocketgit log --oneline
 pocketgit verify
 ```
 
-To try the same workflow without choosing a directory, run `sh examples/demo.sh` from the source checkout. It creates a new temporary repository, verifies the restored bytes, and prints its location for inspection. It never cleans up existing directories.
+`add` changes the proposed snapshot; `commit` records the index rather than implicitly
+staging working files. Switching back to `main` removes the experiment's tracked file
+because it is absent from that branch's snapshot. The existing `hello.txt` remains
+byte-exact. For an executable demonstration with assertions, run:
 
-`restore --commit COMMIT_PREFIX hello.txt` writes the historical bytes to the working file. **Restore discards that file's unstaged edits.** It leaves the index and branch unchanged; `restore hello.txt` then returns the file to its indexed version.
+```bash
+sh examples/demo.sh
+```
 
-## Commands
+The script checks branch transitions and historical/index restoration, verifies the
+repository, and leaves its fresh temporary directory available for inspection.
 
-| Command | Purpose |
+### Restore a selected file
+
+`pocketgit restore hello.txt` writes the indexed bytes back to that working file.
+`pocketgit restore --commit COMMIT_PREFIX hello.txt` writes bytes from a historical
+snapshot. Both deliberately **discard the named file's unstaged edits** while leaving
+the index and branch unchanged. A missing source path is an error, not a deletion.
+See [diff and restore](docs/diff-and-restore.md) for the complete contract.
+
+## The three repository states
+
+```mermaid
+flowchart LR
+    Work[Working files] -->|add| Index[Staging index]
+    Index -->|commit| Head[HEAD snapshot]
+    Index -->|restore FILE| Work
+    Head -->|checkout BRANCH| Work
+```
+
+HEAD identifies the committed snapshot, the index holds the proposed next snapshot,
+and the working tree contains current files. File identity includes both its Blob ID
+and regular/executable mode. A path can therefore have staged and unstaged changes
+at the same time.
+
+| Inspection | Comparison | What it reports |
+| --- | --- | --- |
+| `status` | HEAD → index and index → working tree | Staged additions/modifications/deletions, unstaged modifications/deletions, and untracked paths. |
+| `diff --staged` | HEAD → index | Proposed content and mode changes for the next commit. |
+| `diff` | Index → working tree | Unstaged changes to indexed paths; untracked files are excluded. |
+
+Status hashes actual working bytes rather than trusting file timestamps. Index and
+committed Blobs are also verified with streaming readers. The [status guide](docs/status.md)
+describes ignored paths, missing files, and observation of concurrently changing state.
+
+## Command reference
+
+| Command | Contract |
 | --- | --- |
-| `init [DIRECTORY]` | Initialize an existing directory, preserving existing metadata. |
+| `init [DIRECTORY]` | Initialize an existing directory without overwriting existing metadata. |
 | `config user.name [VALUE]`, `config user.email [VALUE]` | Read or set repository-local author identity. |
-| `add PATH` | Stage a file/directory and deletions within its scope. `add .` stages the entire repository, even from a nested directory. |
-| `commit -m MESSAGE [--allow-empty]` | Commit the index on the current attached branch. |
-| `status [--ignored]` | Show staged, unstaged, untracked, and optionally ignored paths. |
-| `log [--oneline]` | Walk parent-linked history from HEAD, newest first. |
-| `show COMMIT` | Inspect a commit using a full ID or unique lowercase hexadecimal prefix. |
-| `branch [NAME]` | List branches or create one at the current commit without switching. |
-| `checkout BRANCH` | Switch safely to an existing branch. |
-| `diff [--staged]` | Compare index → working tree, or HEAD → index. |
-| `restore [--commit COMMIT] FILE` | Replace one working file from the index or a commit. |
-| `cat-object [--type\|--size\|--pretty] HASH` | Inspect a full-ID object; default output is its exact payload bytes. |
-| `verify` | Validate HEAD, refs, all stored objects, reachable snapshots, and the index. |
-| `gui` | Open the optional read-only history viewer when using the GUI artifact. |
+| `add PATH` | Stage file/directory contents and tracked deletions within scope. `add .` covers the repository even from a nested directory. |
+| `commit -m MESSAGE [--allow-empty]` | Create a snapshot from the index and advance the attached branch. |
+| `status [--ignored]` | Inspect staged, unstaged, untracked, and optionally ignored paths. |
+| `log [--oneline]` | Inspect parent-linked history from HEAD. Shared ancestors are emitted once. |
+| `show COMMIT` | Display commit metadata using a full ID or unique lowercase hexadecimal prefix. |
+| `branch [NAME]` | List branches or create a ref at the current commit; creation does not switch branches. |
+| `checkout BRANCH` | Materialize an existing branch after checking staged work, affected local changes, and path obstructions. |
+| `diff [--staged]` | Render bounded unified text diffs, binary summaries, and mode changes. |
+| `restore [--commit COMMIT] FILE` | Replace one explicitly selected working file from the index or a commit. |
+| `cat-object [--type\|--size\|--pretty] HASH` | Inspect a full-ID object. Default mode extracts its exact payload bytes. |
+| `verify` | Check HEAD, refs, all stored objects, graph relationships, reachable snapshots, and index references. |
+| `gui` | Open the read-only history viewer from the optional GUI artifact. |
 
-Use `pocketgit COMMAND --help` for syntax. Exit codes are 0 for success/help, 1 for execution failures, and 2 for invalid arguments. `POCKETGIT_AUTHOR_NAME` and `POCKETGIT_AUTHOR_EMAIL` override their respective local author settings. Missing identity produces an actionable error.
+Use `pocketgit COMMAND --help` for argument details. Exit codes are **0** for
+success/help, **1** for execution failures, and **2** for invalid arguments.
+Execution errors identify the affected operation without a Java stack trace.
 
-PocketGit accepts UTF-8 `@argument-file` input, including quoted values and multiline messages. On Windows with Java 21, use this route for text outside the active Windows code page; see the [Unicode argument example](docs/release.md#unicode-arguments-on-windows-with-java-21).
+`POCKETGIT_AUTHOR_NAME` and `POCKETGIT_AUTHOR_EMAIL` override their respective local
+settings. Missing or invalid identity blocks commit creation. UTF-8 `@argument-file`
+input supports quoted values and multiline messages. For characters outside the
+active Windows code page on Java 21, use the documented [Unicode argument-file route](docs/release.md#unicode-arguments-on-windows-with-java-21).
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    CLI[Picocli commands] --> Services[Domain services]
-    Services --> Index[Staging index]
-    Services --> Store[Verified object store]
+    CLI[Picocli command boundary] --> Services[Repository services]
+    GUI[JavaFX read-only viewer] --> Readers[History and snapshot readers]
+    Readers --> Objects[Verified object store]
+    Services --> Objects
+    Services --> Index[Versioned index]
     Services --> Refs[HEAD and branch refs]
-    Services --> Diff[Bounded LCS diff]
-    Services --> Work[Safe working-tree editor]
-    Index --> Files[Working files]
-    Work --> Files
-    Store --> Objects[Blobs · Trees · Commits]
-    Refs --> Objects
+    Services --> Diff[Bounded text diff]
+    Services --> Editor[Prepared working-tree edits]
+    Index --> Metadata[Safe metadata publication]
+    Refs --> Metadata
+    Editor --> Working[Working files]
 ```
 
-Command classes parse arguments and format results; services own the behavior and can run without Picocli. `add` stores Blobs and publishes an index. `commit` constructs Trees from that index, writes a Commit, and then advances the branch. Checkout plans and validates every affected path before editing files. See [architecture](docs/architecture.md) for flow, consistency boundaries, and direct service APIs.
+Commands parse and present results; services own repository behavior. Explicit
+working paths, injected clocks, environment lookups, and failure hooks make storage
+and mutation logic testable without a process-global working directory or terminal.
+The JavaFX viewer reuses verified readers and runs storage work outside the UI thread.
 
-## Repository format
+| Boundary | Responsibility | Source |
+| --- | --- | --- |
+| Domain models | Immutable validated Blobs, Trees, Commits, index entries, modes, and result values. | [model](src/main/java/com/pocketgit/model) |
+| Storage | Canonical serialization, streaming envelopes, immutable publication, bounded metadata reads, and locks. | [storage](src/main/java/com/pocketgit/storage) |
+| Repository services | Staging, commit construction, status, history, diff, restore, and checkout coordination. | [services](src/main/java/com/pocketgit/services) |
+| Filesystem and references | Repository discovery, working-state observation, safe paths, HEAD, and portable ref namespaces. | [repository](src/main/java/com/pocketgit/repository), [refs](src/main/java/com/pocketgit/refs) |
+| Validation and algorithms | Whole-store verification, graph checks, bounded LCS, portable names, and terminal-safe presentation. | [validation](src/main/java/com/pocketgit/validation), [diff](src/main/java/com/pocketgit/diff), [utilities](src/main/java/com/pocketgit/util) |
+| Frontends | Picocli commands and optional JavaFX scene. | [CLI](src/main/java/com/pocketgit/cli), [viewer](src/gui/java/com/pocketgit/gui) |
+
+The [architecture guide](docs/architecture.md) follows the publication and rollback
+boundaries in detail. The [decision records](docs/README.md#design-decisions) explain
+why this design uses strict JSON, hard-link publication, cooperative locks, and a
+bounded LCS implementation.
+
+## Storage and integrity
 
 ```text
 .pocketgit/
-├── HEAD                  # ref: refs/heads/main
-├── index                 # versioned, sorted JSON staging snapshot
-├── config                # local author settings
-├── objects/ab/cdef…      # SHA-256 fan-out; one zlib stream per object
-├── refs/heads/main       # full Commit ID, or empty before first commit
-└── logs/HEAD             # commit/checkout ref-movement records
+├── HEAD                  # Symbolic branch ref or detached Commit ID
+├── index                 # Versioned, sorted staging snapshot
+├── config                # Repository-local author settings
+├── objects/ab/cdef…      # SHA-256 fan-out, one zlib stream per object
+├── refs/heads/main       # Commit ID, or empty before the first commit
+├── logs/HEAD             # Commit and checkout movement records
+└── edit-*/               # Private transient working-file preparation
 ```
 
-An object ID is `SHA-256(type + " " + payloadByteLength + NUL + payload)`. Blobs hold raw file bytes. Trees and Commits use canonical compact UTF-8 JSON; sorted entries and explicit property order make IDs deterministic. Every read validates the envelope and hash; semantic reads also validate canonical JSON. The [repository-format specification](docs/repository-format.md) contains the schemas needed to build an independent reader.
+An object's identity is computed over its uncompressed canonical envelope:
 
-Root `.pocketgitignore` supports literal patterns, `*`, `?`, leading `/`, and directory suffix `/`. It does not support negation, `**`, escapes, or nested ignore files. `.pocketgit/` is always excluded; `.git/` is not implicitly excluded. See [staging](docs/staging.md) before initializing PocketGit inside another tool's checkout.
+```text
+SHA-256(ASCII(type) + " " + ASCII(payloadByteLength) + NUL + payload)
+```
 
-## Engineering decisions
+The type is `blob`, `tree`, or `commit`. Blobs contain exact file bytes. Trees contain
+sorted directory entries; Commits reference a root Tree, ordered parents, author,
+timestamp, and message. Compact UTF-8 JSON, explicit property order, and canonical
+reserialization prevent multiple accepted encodings of the same semantic object.
+Compression choices do not alter object identity.
 
-- [SHA-256 and typed immutable objects](docs/decisions/001-object-format.md): hash canonical uncompressed bytes; publish exclusively with hard links.
-- [Deterministic JSON snapshots](docs/decisions/002-index-and-tree-format.md): portable paths, sorted entries, and strict schema validation.
-- [CLI and service separation](docs/decisions/003-cli-and-services.md): keep engine behavior testable without a terminal.
-- [Atomic publication and cooperative locks](docs/decisions/004-metadata-publication.md): fail explicitly when required filesystem operations are unsupported.
-- [Checkout before mutation](docs/decisions/005-safe-checkout.md): detect conflicts across files and directories; preserve unrelated work.
-- [Bounded LCS diff](docs/decisions/006-diff-strategy.md): deterministic, inspectable diffs with explicit resource limits.
-- [Streaming and private edit preparation](docs/decisions/007-streaming-and-edit-preparation.md): verify large Blobs with bounded buffers and retain recoverable originals on disk.
+The object store verifies headers, types, lengths, the complete zlib stream, trailing
+data, and SHA-256. New objects publish through an exclusive hard link after their
+private compressed file is forced. An existing object is verified before reuse;
+corrupt content is reported rather than replaced silently.
 
-## Test and quality checks
+`verify` scans unreachable objects as well as referenced history. It checks the
+index, direct type-correct references, parent graphs, flattened snapshots, and
+portable ref namespaces. It reports deterministic errors and performs no repair or
+collection. Working-file bytes, author configuration, ignore rules, and historic
+reflog semantics are outside that scan. See the [format specification](docs/repository-format.md),
+[object API](docs/object-database.md), and [integrity guide](docs/integrity.md).
 
-`mvn clean verify` compiles Java 21, runs JUnit unit tests, enforces at least 80% core line coverage, packages the executable CLI, and runs integration tests in separate Java processes. Coverage output is in `target/site/jacoco/`. Test fixtures use temporary directories; engine code never launches Git. CI runs the same workflow on Ubuntu, Windows, and macOS; the JavaFX scene check exercises 1,001 changed files with virtualized rows.
+## Working-tree safety
 
-Tests cover corruption, publication failure and rollback, lock contention, checkout conflicts, binary restore, portable path and branch aliases, adversarial ignore patterns, supplementary Unicode, terminal control sequences, shared history graphs, seeded snapshot round trips, and a 1,000-file mixed repository. A packaged workflow exercises the full 64 MiB file limit with a 96 MiB JVM heap. The [input safety audit](docs/input-safety-audit.md), [resource and recovery audit](docs/resource-audit.md), and [earlier audit](docs/audit.md) record regressions and release evidence. [Phase 9 validation](docs/phase-9-validation.md) records coverage and benchmark observations; [phase reports](docs/phase-10-validation.md) distinguish local evidence from CI results.
+Checkout is a planned mutation with explicit failure boundaries:
 
-Further behavior guides: [objects](docs/object-database.md), [commits](docs/commits.md), [status](docs/status.md), [history](docs/history-and-branches.md), [checkout](docs/checkout.md), [diff/restore](docs/diff-and-restore.md), and [integrity](docs/integrity.md). [pocketgit.md](pocketgit.md) remains the authoritative development specification.
+1. Verify source/target objects and read HEAD/index under cooperative writer locks.
+2. Build a complete write/removal/conflict plan. Staged work blocks switching;
+   affected local changes and conflicting untracked/ignored paths block overwrites.
+3. Prepare exact originals and replacements in a private disk directory, then
+   revalidate metadata, working bytes, identity, permissions, and formerly absent paths.
+4. Force and atomically replace complete files, preserving existing required parent
+   directories, then publish index, HEAD, and reflog replacements.
+5. On ordinary failure, attempt file and independent metadata recovery. Retain
+   private original backups and report their location if working-file recovery fails.
 
-## Limits and roadmap
+Unrelated local edits and untracked files survive a successful switch. File/directory
+transitions are supported only when they preserve unrelated paths and directories.
+There is no force-checkout option.
 
-Version 1.0 creates single-parent commits and switches existing branches. Merge, detached checkout, branch deletion, directory restore, staged restore, remote synchronization, Git compatibility, packfiles, and garbage collection are future work.
+The distinction between atomic file replacement and a durable multi-file transaction
+is explicit. Checkout/restore attempt ordinary-failure rollback; process termination
+or power loss can leave partial work, temporary files, or locks. External editors do
+not participate in PocketGit locks. Ref and reflog publication are separate atomic
+operations; a commit that was published before a later failure is reported with its
+ID. [Checkout](docs/checkout.md) and [recovery guidance](docs/integrity.md#private-preparation-and-working-file-recovery)
+explain inspection and manual recovery.
 
-Objects and individual working files are limited to 64 MiB. Textual diff inputs are limited to 8 MiB and 100,000 lines each, with at most 4,000,000 changed-region LCS cells; a command also caps combined text inputs at 32 MiB and output at 250,000 hunk lines. Pretty object inspection is capped at 8 MiB and escapes terminal controls. Checkout preparation uses at most 256 MiB of private disk storage for content and backups. POSIX executable modes are preserved where supported; other platforms use regular-file modes. Symlinks are rejected. Snapshot and branch names must be portable: Windows device names, trailing dots/spaces, and separate case/Unicode-normalization aliases are rejected on every platform.
+## Verification and quality
 
-Metadata replacements are individually atomic, and ordinary checkout/restore failures attempt rollback. Multi-file operations are not crash-atomic; power loss or process termination can leave partial work, locks, and temporary files. Incomplete working-file rollback retains its private backups and a path manifest for manual recovery. Locks coordinate PocketGit writers, not external editors. [Recovery guidance](docs/integrity.md) explains inspecting and removing stale locks; `verify` diagnoses metadata and objects without repairing them.
+The release gate exercises **473 tests: 441 unit cases and 32 packaged integration
+cases**. Integration tests start fresh Java processes against the runnable JAR;
+engine tests use isolated repositories and inspect actual bytes and metadata.
+[Validation evidence](docs/validation.md) records the measured coverage, environment,
+checksums, and provenance of platform results.
 
-Future work starts with durable transaction recovery and three-way merge, followed by tags, reflog recovery, object collection, and optional remote transport. Native installers are optional distribution improvements; Java 21 and the self-contained CLI JAR remain the baseline.
+| Check | What it establishes |
+| --- | --- |
+| Spotless | Pinned formatting for engine, test, and GUI Java sources; checked during Maven validation. |
+| JUnit | Deterministic serialization, repository behavior, failure injection, portable inputs, and algorithm regressions. |
+| JaCoCo | An 80% core line-coverage gate; CLI/bootstrap/UI have separate boundary checks. |
+| Packaged integration tests | Process restarts, launcher behavior, parsing, Unicode, exact extraction, and complete snapshot workflows. |
+| SpotBugs | Selected high-priority correctness and concurrency findings at maximum effort. |
+| JavaFX scene check | Actual selection/details, 1,001 changed-file records, bounded visible cells, and unchanged metadata manifests. |
+| Release manifests | Digests of the versioned CLI and GUI JARs. |
+
+Important regression strategies include a 2,000-case seeded ignore matcher oracle,
+shared history forests, corruption and missing objects, publication failures,
+blocked rollback, lock contention, path/ref aliases, terminal controls, and seeded
+snapshot round trips. A maximum-size 64 MiB Blob workflow runs in separate JVMs
+with `-Xmx96m`, checking stage/restage, commit, diff, restore, checkout, status,
+verification, and exact raw extraction.
+
+CI runs native CLI gates on Ubuntu, Windows, and macOS; the optional GUI build and
+headless scene run on Linux. The status badge links to current workflow results.
+Historical native runs and local checks are recorded separately; a configured job
+is not a claim that a particular revision passed it.
+
+For focused work:
+
+```bash
+mvn -Dtest=CheckoutServiceTest test
+mvn spotless:apply
+mvn clean verify
+```
+
+See [development workflow](docs/development-workflow.md) and [maintainer guidance](CONTRIBUTING.md)
+for change review, dependency updates, and acceptance criteria.
+
+## Optional history viewer
+
+![Verified JavaFX history scene with 1,001 changed files](docs/screenshots/resource-history-viewer.png)
+
+The viewer displays branch tips, child-before-parent history, parent links, commit
+metadata, and sorted changed paths. It reads through the same verified services,
+loads data on a background worker, cancels obsolete selection tasks, and virtualizes
+large file lists. Selecting a branch changes the view rather than repository HEAD.
+
+```bash
+mvn -Pgui clean verify
+java -jar /absolute/path/pocketgit-gui-1.0.0.jar gui
+```
+
+Build this artifact on its target operating system so JavaFX native libraries match.
+It requires a desktop display; CI uses checksum-pinned Monocle and software rendering
+for offscreen validation. The ordinary CLI artifact remains independent of JavaFX.
+`clean` removes artifacts from the preceding profile, so save a CLI release outside
+`target/` before building the viewer. See the [viewer guide](docs/gui.md).
+
+## Resource policy and compatibility
+
+| Resource or behavior | Supported bound |
+| --- | --- |
+| Object payload / staged file | 64 MiB by default. Blob workflows stream; Tree/Commit decoding and retaining embedding APIs still use payload memory. |
+| Working-file edit preparation | 256 MiB combined original/replacement content on private disk. |
+| Index | 16 MiB serialized metadata. |
+| Snapshot traversal | 256 path components and 100,000 expanded nodes. |
+| Commit-history traversal | 100,000 distinct commits. |
+| Text diff input | 8 MiB and 100,000 lines per side. |
+| Changed-region LCS matrix | 4,000,000 cells in a flat array. |
+| One diff command | 32 MiB combined text inputs and 250,000 retained hunk lines. |
+| Pretty object inspection | 8 MiB; terminal/directional controls escaped. Raw mode remains byte-exact. |
+| Viewer | Up to 2,000 displayed commits; 15 graph lanes plus a condensed overflow column. |
+
+Snapshot and ref names reject traversal, Windows device names, trailing dots/spaces,
+and separate case or Unicode-normalization aliases. Symlinks and unsupported file
+types are rejected. POSIX executable distinction is preserved where available;
+other platforms use regular-file modes. Additional filesystem path-length limits
+still apply.
+
+Root `.pocketgitignore` supports literal patterns, `*`, `?`, leading `/`, and directory
+suffix `/`. Negation, `**`, escapes, and nested ignore files are outside the supported
+subset. Unicode matching operates on code points with a bounded greedy algorithm.
+See [staging](docs/staging.md) for exact scope and matching semantics.
+
+## Development direction
+
+Version 1.0 creates single-parent commits and switches existing branches. Durable
+transaction recovery and three-way merge are the next substantial design problems.
+Detached checkout, tags, reflog recovery, staged/directory restore, packfiles,
+garbage collection, and remote transport require separate specifications and
+acceptance tests. These are roadmap items rather than current capabilities.
+
+The engineering process is owner-led and requirements-driven. Agent-assisted work
+is evaluated against storage invariants, regression evidence, reviewable diffs, and
+release gates. Project ownership is assigned to `shahrdazri-ctrl` through
+[CODEOWNERS](.github/CODEOWNERS) and build metadata. The repository maintains a single
+`main` branch; scheduled dependency-update PRs are disabled and dependency changes
+are reviewed directly against the same release checks.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md). It separates current contracts,
+design decisions, validation evidence, and historical implementation records.
+
+- [Engineering specification](pocketgit.md): product scope, invariants, operation contracts, and acceptance requirements.
+- [Architecture](docs/architecture.md): boundaries, publication flow, graph processing, and consistency.
+- [Repository format](docs/repository-format.md): independent-reader schemas and compatibility rules.
+- [Working-tree safety](docs/checkout.md) and [integrity/recovery](docs/integrity.md): mutation and recovery boundaries.
+- [Development workflow](docs/development-workflow.md) and [validation evidence](docs/validation.md): how changes are assessed and reproduced.

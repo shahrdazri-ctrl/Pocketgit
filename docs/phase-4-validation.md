@@ -1,5 +1,7 @@
 # Phase 4 validation
 
+> Historical implementation record. Current behavior is documented in the [documentation index](README.md); current release checks are in [validation](validation.md).
+
 Reproduce with JDK 21+ and Maven 3.9+:
 
 ```bash

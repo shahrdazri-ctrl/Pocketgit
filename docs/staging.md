@@ -1,4 +1,4 @@
-# Staging and add — Phase 3
+# Staging and add
 
 The index is the proposed file snapshot for the next commit. `add` writes immutable Blob objects and updates index entries; it never changes working-tree files, HEAD, or branch refs. [Commits](commits.md) snapshot this index; [status](status.md) compares it with HEAD and working files.
 
@@ -9,7 +9,7 @@ pocketgit add .
 pocketgit add -- -filename
 ```
 
-Exactly one path argument is required. File and directory arguments resolve from the invocation's current directory. Absolute paths within the repository are also accepted. In accordance with the master prompt's whole-working-tree scope, **`add .` stages the entire repository even when invoked from a nested directory**. This differs from Git's current-directory scope. Use a named directory argument to narrow the scope.
+Exactly one path argument is required. File and directory arguments resolve from the invocation's current directory. Absolute paths within the repository are also accepted. **`add .` stages the entire repository even when invoked from a nested directory**. This differs from Git's current-directory scope. Use a named directory argument to narrow the scope.
 
 New and modified regular files create/update entries. Unchanged files are verified and retain their existing Blob IDs; an unchanged index is not rewritten. Missing indexed files under the requested scope are removed from the index, staging their deletion. An absent directory can stage deletion of its indexed descendants. Missing paths that have no entries fail clearly. Entries outside the scope are preserved, except conflicting ancestors in file/directory replacements: staging `a/child` after indexed file `a` becomes a directory necessarily removes the old `a` entry.
 

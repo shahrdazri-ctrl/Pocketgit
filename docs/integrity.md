@@ -1,4 +1,4 @@
-# Integrity and reliability (Phase 9)
+# Integrity and reliability
 
 `pocketgit verify` checks symbolic/detached HEAD, every branch ref, every stored object's SHA-256 and canonical payload, direct Tree/Commit references, all reachable parent graphs and flattened snapshots, and index parsing and Blob references. Unreachable objects are also scanned. Illegal object names, symlink metadata, missing/wrong-type objects, malformed metadata, and corrupt bytes are errors. It reports deterministic errors and exits 1, without repairing or deleting data. Configuration, ignore rules, reflog semantics, and working-file content are outside this integrity check.
 
@@ -8,7 +8,7 @@ Normal errors print concise messages without Java stack traces. Object reading, 
 
 JaCoCo instruments the unit suite and enforces at least 80% line coverage for core code (storage, services, models, refs, validation, repository, diff, and utilities). CLI parsing/formatting and bootstrap are excluded from that core gate and exercised by CLI and packaged integration tests. Coverage HTML and XML are generated under `target/site/jacoco/`. This is a regression gate; test assertions cover behavior, not line execution alone.
 
-Reliability tests include deliberate corruption, publication-failure rollback, lock contention, symlink safety, seeded random snapshot round trips through checkout/restore, and a 1,000-file mixed text/binary repository. See the phase validation report for actual results and benchmark measurements. Multi-file operations still have the crash/concurrent-editor limitations in [checkout](checkout.md).
+Reliability tests include deliberate corruption, publication-failure rollback, lock contention, symlink safety, seeded random snapshot round trips through checkout/restore, and a 1,000-file mixed text/binary repository. See [validation evidence](validation.md) for current release checks and the recorded regression investigations. Multi-file operations still have the crash/concurrent-editor limitations in [checkout](checkout.md).
 
 ## Private preparation and working-file recovery
 

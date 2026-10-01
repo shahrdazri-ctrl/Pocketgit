@@ -1,11 +1,14 @@
-# Repository Development Instructions
+# Repository development instructions
 
-Read [pocketgit.md](pocketgit.md) in full before implementing changes. It is the authoritative development specification for PocketGit.
+Read [pocketgit.md](pocketgit.md) before changing engine behavior. It is the current
+engineering specification; all ten original implementation milestones are complete.
+Use the [documentation index](docs/README.md) for current contracts and the
+[engineering workflow](docs/development-workflow.md) for change acceptance.
 
-- Follow its ten phases in order; assess the current implementation before selecting the next phase.
-- Use Java 21+ and implement the version-control engine without delegating to Git or JGit.
-- Keep CLI parsing and output separate from testable domain services.
-- Preserve deterministic object formats, repository integrity, and user files; enforce the specification's checkout safety requirements.
-- During implementation, run the applicable compilation, unit tests, integration tests, and real CLI workflows before declaring a phase complete.
-- Update documentation when behavior or storage formats change. Commit completed phases independently.
-- Report only behavior and validation supported by actual evidence; do not label unimplemented features as complete.
+- Use Java 21+ and Maven 3.9+. Implement the engine without Git, JGit, or external diff/compression processes.
+- Keep CLI parsing/presentation and the optional viewer separate from testable domain services.
+- Preserve canonical object formats, repository integrity, portable names, and user files. Follow checkout's planning and recovery requirements.
+- Run pinned formatting and checks appropriate to the change; full release verification is required for engine/dependency changes. Report only observed results.
+- Add meaningful regressions for confirmed defects. Document behavior, storage compatibility, resource bounds, and failure limitations when they change.
+- Keep commits focused and reviewable on `main`; do not create extra repository branches.
+- Attribute project ownership to `shahrdazri-ctrl`. Published-history rewrites require a concrete preview and owner approval; do not infer permission from a request to prepare one.
